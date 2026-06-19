@@ -567,7 +567,6 @@ function doSave(){
   var now=new Date();
   var label=now.toLocaleDateString('en',{month:'short',day:'numeric'})+' '+now.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
   arr.unshift({id:'s'+Date.now(),name:f.name,content:f.content,date:label});
-  /* keep max 50 saves */
   if(arr.length>50)arr=arr.slice(0,50);
   setSaves(arr);
   showToast('Saved: '+f.name);
@@ -611,7 +610,6 @@ function renderSavesList(){
   });
   savesList.innerHTML=html;
 
-  /* Load */
   savesList.querySelectorAll('[data-load]').forEach(function(btn){
     btn.addEventListener('click',function(){
       var id=this.getAttribute('data-load');
@@ -632,7 +630,6 @@ function renderSavesList(){
     });
   });
 
-  /* Delete */
   savesList.querySelectorAll('[data-del]').forEach(function(btn){
     btn.addEventListener('click',function(){
       var id=this.getAttribute('data-del');
@@ -689,7 +686,6 @@ addFileBtn.addEventListener('click',function(){
    PREVIEW  — Base64 injection (safe)
 ══════════════════════════════════════ */
 function buildPreview(code){
-  /* encode user code as base64 so </script> can never appear inside the script block */
   var b64;
   try{b64=btoa(unescape(encodeURIComponent(code)));}
   catch(e){b64=btoa(code);}
@@ -735,7 +731,6 @@ function buildPreview(code){
 
 function openPreview(){
   var html=buildPreview(getFile().content);
-  /* use srcdoc — avoids doc.write cross-origin issues */
   previewFrame.srcdoc=html;
   previewOverlay.classList.add('show');
 }
