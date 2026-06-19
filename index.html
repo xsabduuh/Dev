@@ -174,8 +174,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
     <div class="line-nums" id="lineNums"></div>
     <div class="editor-inner">
       <div class="hl-layer" id="hlLayer" aria-hidden="true"></div>
-      <textarea class="code-area" id="codeArea"
-        spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+      <textarea class="code-area" id="codeArea" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
     </div>
   </div>
 
@@ -363,11 +362,10 @@ function migrateData() {
       var oldData = JSON.parse(localStorage.getItem(dataKey) || '[]');
       var newData = oldData.map(function(item) {
         if (!item.type) {
-          // إذا كان يحوي حقل files فهو مشروع قديم بدون type (نادر)، نعامله كـ project
           if (item.files) {
             item.type = 'project';
           } else {
-            item.type = 'file'; // الملفات الفردية القديمة
+            item.type = 'file';
           }
         }
         return item;
@@ -380,7 +378,6 @@ function migrateData() {
   localStorage.setItem(versionKey, currentVersion);
 }
 
-// نفّذ الترقية فوراً قبل أي شيء آخر
 migrateData();
 
 /* ══════════════════════════════════════
@@ -574,34 +571,29 @@ function cancelRename(){
 }
 
 /* ══════════════════════════════════════
-   SMART PASTE DETECTION
+   SMART PASTE DETECTION (الإصلاح الكامل)
 ══════════════════════════════════════ */
 function detectLanguage(content) {
-  // تحقق من HTML
+  // HTML
   if (/^\s*<!DOCTYPE html>/i.test(content) || /<html[\s>]/i.test(content) || /<head[\s>]/i.test(content) || /<body[\s>]/i.test(content)) {
     return 'html';
   }
-  // تحقق من CSS (وجود محددات مع { وخصائص)
-  if (/[.#]?[\w-]+\s*\{[^}]*:[^}]*\}/.test(content) && !/<[a-z]+\b/i.test(content)) {
+  // CSS (تحسين الكشف عن أي كود CSS)
+  if (/[.#]?[\w-]+(\s*,\s*[.#]?[\w-]+)*\s*\{[^}]*:[^}]*\}/.test(content) && !/<[a-z]+/i.test(content)) {
     return 'css';
   }
-  // تحقق من JavaScript (وجود كلمات رئيسية)
-  if (/\b(function|const|let|var|=>|import|export|class\s+\w+)\b/.test(content) && !/<[a-z]+\b/i.test(content)) {
+  // JavaScript
+  if (/\b(function|const|let|var|=>|import|export|class\s+\w+)\b/.test(content) && !/<[a-z]+/i.test(content)) {
     return 'javascript';
   }
-  // افتراضي: حسب الامتداد الحالي
-  var current = getFile();
-  if (/\.html$/i.test(current.name)) return 'html';
-  if (/\.css$/i.test(current.name)) return 'css';
-  if (/\.js$/i.test(current.name)) return 'javascript';
   return null;
 }
 
 function autoRenameAfterPaste() {
   var f = getFile();
-  // لا نغير الاسم إذا كان المستخدم قد أعاد تسميته يدوياً سابقاً (ليس افتراضيًا)
-  var isDefaultName = (f.name === 'index.html' && f.content === '') || /^file\d+\.(js|css|html)$/i.test(f.name);
-  if (!isDefaultName) return;
+  var nameLower = f.name.toLowerCase();
+  var isDefault = (nameLower === 'index.html') || /^file\d+\.(js|css|html)$/i.test(f.name) || nameLower === 'style.css' || nameLower === 'script.js';
+  if (!isDefault) return;
 
   var content = f.content;
   if (!content.trim()) return;
@@ -615,14 +607,19 @@ function autoRenameAfterPaste() {
   else if (lang === 'javascript') newName = 'script.js';
   else return;
 
-  // إذا كان الاسم هو نفسه المقترح، لا نفعل شيئًا
   if (f.name === newName) return;
 
-  // تغيير الاسم تلقائيًا
   f.name = newName;
   renderTabs();
   showToast('Renamed to ' + newName + ' (based on content)');
 }
+
+// حدث اللصق
+codeArea.addEventListener('paste', function() {
+  setTimeout(function() {
+    autoRenameAfterPaste();
+  }, 50);
+});
 
 /* ══════════════════════════════════════
    UNDO / REDO
@@ -670,15 +667,6 @@ codeArea.addEventListener('input',function(){
     if(val!==snap){pushUndo(snap);lastCommit=val;updateBtns();}
   },600);
 });
-
-// حدث اللصق للكشف التلقائي
-codeArea.addEventListener('paste', function() {
-  // ننتظر حتى يتم تحديث القيمة (المتصفح يقوم باللصق بعد هذا الحدث)
-  setTimeout(function() {
-    autoRenameAfterPaste();
-  }, 50);
-});
-
 codeArea.addEventListener('scroll',function(){
   hlLayer.scrollTop=codeArea.scrollTop;
   hlLayer.scrollLeft=codeArea.scrollLeft;
@@ -738,7 +726,6 @@ function setSaves(arr){
 }
 
 function doSave(){
-  // طلب اسم المشروع من المستخدم
   var projectName = prompt('Enter a name for your project:', 'MyProject');
   if (!projectName || !projectName.trim()) {
     showToast('Save cancelled');
@@ -747,7 +734,6 @@ function doSave(){
   }
   projectName = projectName.trim();
 
-  // حفظ جميع الملفات المفتوحة كمشروع
   var arr = getSaves();
   var now = new Date();
   var label = now.toLocaleDateString('en',{month:'short',day:'numeric'})+' '+now.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
@@ -774,16 +760,16 @@ function doSave(){
 saveBtn.addEventListener('click', doSave);
 
 /* ══════════════════════════════════════
-   SAVED FILES PANEL (with project support)
+   SAVED FILES PANEL (إصلاح التحميل)
 ══════════════════════════════════════ */
-function renderSavesList(){
+function renderSavesList() {
   var arr = getSaves();
-  if(!arr.length){
-    savesList.innerHTML='<div class="save-empty">No saved files or projects.<br>Use <strong>Save Project</strong> to save all tabs.</div>';
+  if(!arr.length) {
+    savesList.innerHTML = '<div class="save-empty">No saved files or projects.<br>Use <strong>Save Project</strong> to save all tabs.</div>';
     return;
   }
-  var html='';
-  arr.forEach(function(s){
+  var html = '';
+  arr.forEach(function(s) {
     var isProject = (s.type === 'project');
     var iconSvg = isProject 
       ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#82aaff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polyline points="17 8 12 13 8 10"/></svg>'
@@ -792,7 +778,7 @@ function renderSavesList(){
     var nameDisplay = esc(s.name);
     if (isProject) nameDisplay += ' <span style="color:#82aaff;font-size:11px;">[Project]</span>';
 
-    html+=
+    html +=
       '<div class="save-card" data-id="'+s.id+'">'
       +'<div class="save-icon">'+iconSvg+'</div>'
       +'<div class="save-info">'
@@ -810,23 +796,21 @@ function renderSavesList(){
       +'</div>'
       +'</div>';
   });
-  savesList.innerHTML=html;
+  savesList.innerHTML = html;
 
-  // تحميل (لمشروع أو ملف)
-  savesList.querySelectorAll('[data-load]').forEach(function(btn){
-    btn.addEventListener('click',function(){
-      var id=this.getAttribute('data-load');
+  // معالجة التحميل
+  savesList.querySelectorAll('[data-load]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-load');
       var arr2 = getSaves();
-      for(var i=0;i<arr2.length;i++){
-        if(arr2[i].id === id){
+      for(var i = 0; i < arr2.length; i++) {
+        if(arr2[i].id === id) {
           var item = arr2[i];
           if(item.type === 'project' && item.files) {
-            // استبدال جميع التبويبات بمحتويات المشروع
             commitUndo();
             files = item.files.map(function(f) {
               return { id: f.id, name: f.name, content: f.content };
             });
-            // إعادة بناء undoSt و redoSt لكل ملف
             undoSt = {}; redoSt = {};
             files.forEach(function(f) {
               undoSt[f.id] = [];
@@ -839,7 +823,7 @@ function renderSavesList(){
             renderTabs();
             renderEditor();
           } else {
-            // تحميل ملف واحد (وظيفة قديمة)
+            // تحميل ملف واحد (احتياط)
             commitUndo();
             getFile().name = item.name;
             pushUndo(getFile().content);
@@ -855,10 +839,11 @@ function renderSavesList(){
     });
   });
 
-  savesList.querySelectorAll('[data-del]').forEach(function(btn){
-    btn.addEventListener('click',function(){
-      var id=this.getAttribute('data-del');
-      var arr2 = getSaves().filter(function(s){return s.id!==id;});
+  // معالجة الحذف
+  savesList.querySelectorAll('[data-del]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-del');
+      var arr2 = getSaves().filter(function(s){ return s.id !== id; });
       setSaves(arr2);
       renderSavesList();
       showToast('Deleted');
