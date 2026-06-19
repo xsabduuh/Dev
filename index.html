@@ -347,7 +347,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 /* ══════════════════════════════════════
    DATA MIGRATION SYSTEM
 ══════════════════════════════════════ */
-var DATA_VERSION = 2; // تمت زيادته لإضافة دعم المشاريع
+var DATA_VERSION = 2;
 
 function migrateData() {
   var versionKey = 'ce_saves_version';
@@ -356,7 +356,6 @@ function migrateData() {
   var storedVersion = localStorage.getItem(versionKey);
   var currentVersion = parseInt(storedVersion, 10) || 0;
 
-  // الترقية من 0 أو 1 إلى 2 (إضافة حقل type للعناصر القديمة)
   if (currentVersion < 2 && localStorage.getItem(dataKey)) {
     try {
       var oldData = JSON.parse(localStorage.getItem(dataKey) || '[]');
@@ -466,6 +465,7 @@ function showToast(msg){
    RENDER
 ══════════════════════════════════════ */
 function renderLineNums(text){
+  if (!text) { lineNums.innerHTML = ''; return; }
   var n=(text.match(/\n/g)||[]).length+1,h='';
   for(var i=1;i<=n;i++)h+='<div class="ln">'+i+'</div>';
   lineNums.innerHTML=h;
@@ -571,18 +571,15 @@ function cancelRename(){
 }
 
 /* ══════════════════════════════════════
-   SMART PASTE DETECTION (الإصلاح الكامل)
+   SMART PASTE DETECTION
 ══════════════════════════════════════ */
 function detectLanguage(content) {
-  // HTML
   if (/^\s*<!DOCTYPE html>/i.test(content) || /<html[\s>]/i.test(content) || /<head[\s>]/i.test(content) || /<body[\s>]/i.test(content)) {
     return 'html';
   }
-  // CSS (تحسين الكشف عن أي كود CSS)
   if (/[.#]?[\w-]+(\s*,\s*[.#]?[\w-]+)*\s*\{[^}]*:[^}]*\}/.test(content) && !/<[a-z]+/i.test(content)) {
     return 'css';
   }
-  // JavaScript
   if (/\b(function|const|let|var|=>|import|export|class\s+\w+)\b/.test(content) && !/<[a-z]+/i.test(content)) {
     return 'javascript';
   }
@@ -614,7 +611,6 @@ function autoRenameAfterPaste() {
   showToast('Renamed to ' + newName + ' (based on content)');
 }
 
-// حدث اللصق
 codeArea.addEventListener('paste', function() {
   setTimeout(function() {
     autoRenameAfterPaste();
@@ -714,7 +710,7 @@ menuBtn.addEventListener('click',function(e){e.stopPropagation();var o=dropdown.
 document.addEventListener('mousedown',function(e){if(!dropdown.contains(e.target)&&e.target!==menuBtn)closeDropdown();});
 
 /* ══════════════════════════════════════
-   PROJECT SAVE (Save all tabs with a name)
+   PROJECT SAVE
 ══════════════════════════════════════ */
 var LS_KEY='ce_saves_v1';
 
@@ -760,7 +756,7 @@ function doSave(){
 saveBtn.addEventListener('click', doSave);
 
 /* ══════════════════════════════════════
-   SAVED FILES PANEL (إصلاح التحميل)
+   SAVED FILES PANEL
 ══════════════════════════════════════ */
 function renderSavesList() {
   var arr = getSaves();
@@ -798,7 +794,7 @@ function renderSavesList() {
   });
   savesList.innerHTML = html;
 
-  // معالجة التحميل
+  // تحميل
   savesList.querySelectorAll('[data-load]').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var id = this.getAttribute('data-load');
@@ -823,7 +819,7 @@ function renderSavesList() {
             renderTabs();
             renderEditor();
           } else {
-            // تحميل ملف واحد (احتياط)
+            // تحميل ملف واحد
             commitUndo();
             getFile().name = item.name;
             pushUndo(getFile().content);
@@ -839,7 +835,7 @@ function renderSavesList() {
     });
   });
 
-  // معالجة الحذف
+  // حذف
   savesList.querySelectorAll('[data-del]').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var id = this.getAttribute('data-del');
@@ -875,11 +871,11 @@ renameBtn.addEventListener('click',function(e){
 
 addFileBtn.addEventListener('click',function(){
   var id=nextId++,name='file'+id+'.js';
-  files.push({id:id,name:name,content:'// New file\n'});
+  files.push({id:id,name:name,content:''});  // محتوى فارغ الآن
   undoSt[id]=[];redoSt[id]=[];
   commitUndo();activeId=id;
   editingTabId = null;
-  renderTabs();renderEditor();lastCommit='// New file\n';
+  renderTabs();renderEditor();lastCommit='';
   closeDropdown();codeArea.focus();
 });
 
