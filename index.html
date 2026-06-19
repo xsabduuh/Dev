@@ -3,11 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<!-- أيقونة التطبيق للشاشة الرئيسية والأيقونة في المتصفح -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%23111'/><path d='M20 16 L10 32 L20 48' stroke='%23c792ea' stroke-width='6' fill='none' stroke-linecap='round'/><path d='M44 16 L54 32 L44 48' stroke='%23c792ea' stroke-width='6' fill='none' stroke-linecap='round'/><line x1='32' y1='16' x2='32' y2='48' stroke='%23c792ea' stroke-width='4' stroke-linecap='round'/></svg>">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='24' fill='%23111'/><path d='M60 45 L25 90 L60 135' stroke='%23c792ea' stroke-width='12' fill='none' stroke-linecap='round'/><path d='M120 45 L155 90 L120 135' stroke='%23c792ea' stroke-width='12' fill='none' stroke-linecap='round'/><line x1='90' y1='45' x2='90' y2='135' stroke='%23c792ea' stroke-width='8' stroke-linecap='round'/></svg>">
+<!-- apple-touch-icon placeholder — will be replaced by canvas-generated PNG via JS -->
+<link rel="apple-touch-icon" id="appleTouchIcon" href="">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Code Editor">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#c792ea">
 <title>Code Editor – Final</title>
 <style>
@@ -141,7 +143,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 /* Preview – Full Screen Overlay */
 .preview-overlay{position:fixed;inset:0;background:#000;z-index:800;display:none;}
 .preview-overlay.show{display:block;}
-.preview-frame{position:absolute;top:0;left:0;width:100%;height:100%;border:none;background:#000;}
+.preview-frame{position:absolute;top:0;left:0;width:100%;height:100%;border:none;background:#fff;}
 .preview-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(20,20,20,.9);border:1px solid var(--bhi);color:var(--fg2);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:810;transition:background .12s,color .12s,border-color .12s;}
 .preview-close:hover{background:rgba(255,83,112,.2);color:var(--red);border-color:rgba(255,83,112,.4);}
 
@@ -293,7 +295,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
       <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
     </svg>
   </button>
-  <iframe class="preview-frame" id="previewFrame" title="Code Preview" sandbox="allow-scripts allow-same-origin"></iframe>
+  <iframe class="preview-frame" id="previewFrame" title="Code Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>
 </div>
 
 <!-- Toast -->
@@ -306,6 +308,100 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
    ========================================================= */
 (function(){
 'use strict';
+
+/* ═══════════ PWA ICON — Canvas PNG (Fix: iOS requires PNG, not SVG data URI) ═══════════ */
+(function generatePWAIcon(){
+  try {
+    var canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 512;
+    var ctx = canvas.getContext('2d');
+    var size = 512, r = 80;
+
+    /* Background with rounded corners */
+    ctx.beginPath();
+    ctx.moveTo(r, 0); ctx.lineTo(size - r, 0);
+    ctx.arcTo(size, 0, size, r, r);
+    ctx.lineTo(size, size - r);
+    ctx.arcTo(size, size, size - r, size, r);
+    ctx.lineTo(r, size);
+    ctx.arcTo(0, size, 0, size - r, r);
+    ctx.lineTo(0, r);
+    ctx.arcTo(0, 0, r, 0, r);
+    ctx.closePath();
+
+    /* Gradient background */
+    var grad = ctx.createLinearGradient(0, 0, size, size);
+    grad.addColorStop(0, '#1a0a2e');
+    grad.addColorStop(1, '#0d0d0d');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    /* Subtle inner glow */
+    var glow = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    glow.addColorStop(0, 'rgba(199,146,234,0.08)');
+    glow.addColorStop(1, 'rgba(199,146,234,0)');
+    ctx.fillStyle = glow;
+    ctx.fill();
+
+    ctx.strokeStyle = '#c792ea';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    /* Left bracket < */
+    ctx.lineWidth = 38;
+    ctx.shadowColor = '#c792ea';
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.moveTo(190, 148);
+    ctx.lineTo(90, 256);
+    ctx.lineTo(190, 364);
+    ctx.stroke();
+
+    /* Right bracket > */
+    ctx.beginPath();
+    ctx.moveTo(322, 148);
+    ctx.lineTo(422, 256);
+    ctx.lineTo(322, 364);
+    ctx.stroke();
+
+    /* Center vertical line */
+    ctx.lineWidth = 28;
+    ctx.beginPath();
+    ctx.moveTo(256, 148);
+    ctx.lineTo(256, 364);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    var dataURL = canvas.toDataURL('image/png');
+
+    /* Set apple-touch-icon as real PNG */
+    var touchIcon = document.getElementById('appleTouchIcon');
+    if (touchIcon) touchIcon.href = dataURL;
+
+    /* Inject Web App Manifest dynamically */
+    var manifest = {
+      name: 'Code Editor',
+      short_name: 'Editor',
+      description: 'A mobile code editor',
+      display: 'standalone',
+      orientation: 'portrait',
+      start_url: '.',
+      background_color: '#000000',
+      theme_color: '#c792ea',
+      icons: [
+        { src: dataURL, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+      ]
+    };
+    var blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+    var manifestURL = URL.createObjectURL(blob);
+    var manifestLink = document.createElement('link');
+    manifestLink.rel = 'manifest';
+    manifestLink.href = manifestURL;
+    document.head.appendChild(manifestLink);
+
+  } catch(e) { /* canvas unsupported — fallback to SVG icon already in head */ }
+})();
 
 /* ═══════════ MIGRATION ═══════════ */
 var DATA_VERSION = 2;
@@ -401,14 +497,26 @@ function showToast(msg){
   toastTimer=setTimeout(function(){toastEl.classList.remove('show');},2200);
 }
 
+/* ═══════════ SCROLL SYNC (Fix: sync all layers after render) ═══════════ */
+function syncScroll(){
+  hlLayer.scrollTop=codeArea.scrollTop;
+  hlLayer.scrollLeft=codeArea.scrollLeft;
+  lineNums.scrollTop=codeArea.scrollTop;
+}
+
 /* ═══════════ RENDER ═══════════ */
 function renderLineNums(text){
   var n = (text.match(/\n/g)||[]).length + 1;
   var h='';
   for(var i=1;i<=n;i++) h+='<div class="ln">'+i+'</div>';
   lineNums.innerHTML=h;
+  lineNums.scrollTop=codeArea.scrollTop;
 }
-function renderHL(text){hlLayer.innerHTML=highlight(text)+'\n';}
+function renderHL(text){
+  hlLayer.innerHTML=highlight(text)+'\n';
+  hlLayer.scrollTop=codeArea.scrollTop;
+  hlLayer.scrollLeft=codeArea.scrollLeft;
+}
 function updateBtns(){
   undoBtn.disabled=!(undoSt[activeId]&&undoSt[activeId].length>0);
   redoBtn.disabled=!(redoSt[activeId]&&redoSt[activeId].length>0);
@@ -447,7 +555,7 @@ function renderTabs(){
         btn.appendChild(x);
       }
 
-      // Long press detection with flag (no preventDefault on touchstart)
+      /* Long press detection */
       var pressStartTime = 0;
       var longPressed = false;
 
@@ -599,12 +707,19 @@ function autoRenameAfterPaste() {
 
 codeArea.addEventListener('paste', function() {
   setTimeout(function() {
-    // إصلاح: إعادة التمرير إلى الأعلى بعد اللصق
-    codeArea.scrollTop = 0;
-    // مزامنة الطبقات الأخرى
-    hlLayer.scrollTop = 0;
-    lineNums.scrollTop = 0;
+    var val = codeArea.value;
+    /* Update file content first */
+    for(var k=0;k<files.length;k++)if(files[k].id===activeId){files[k].content=val;break;}
+    renderHL(val);
+    renderLineNums(val);
+    /* Only reset scroll if content was empty before paste (fresh paste) */
+    if (!lastCommit.trim()) {
+      codeArea.scrollTop = 0;
+      syncScroll();
+    }
     autoRenameAfterPaste();
+    lastCommit = val;
+    updateBtns();
   }, 10);
 });
 
@@ -649,7 +764,8 @@ function doRedo(){
 codeArea.addEventListener('input',function(){
   var val=codeArea.value;
   for(var k=0;k<files.length;k++)if(files[k].id===activeId){files[k].content=val;break;}
-  renderHL(val);renderLineNums(val);
+  renderHL(val);
+  renderLineNums(val);
   clearTimeout(undoTimer);
   var snap=lastCommit;
   undoTimer=setTimeout(function(){
@@ -777,7 +893,6 @@ function renderSavesList() {
             undoSt = {}; redoSt = {};
             files.forEach(function(f){ undoSt[f.id] = []; redoSt[f.id] = []; });
             activeId = files[0].id;
-            // الإصلاح: التعامل مع المصفوفة الفارغة بأمان
             var maxId = files.length > 0 ? Math.max.apply(null, files.map(function(f){ return f.id; })) : 0;
             nextId = maxId + 1;
             editingTabId = null;
@@ -839,37 +954,82 @@ addFileBtn.addEventListener('click',function(){
   codeArea.focus();
 });
 
-/* ═══════════ UNIVERSAL MULTI-FILE PREVIEW ═══════════ */
+/* ═══════════ UNIVERSAL MULTI-FILE PREVIEW (Fixed) ═══════════ */
 function buildMultiFilePreview(){
   var activeFile = getFile();
   var baseFile = null;
-  if (/\.html$/i.test(activeFile.name)) { baseFile = activeFile; }
-  else {
+
+  if (/\.html$/i.test(activeFile.name)) {
+    baseFile = activeFile;
+  } else {
     for (var i = 0; i < files.length; i++) {
       if (/\.html$/i.test(files[i].name)) { baseFile = files[i]; break; }
     }
   }
-  if (!baseFile) return activeFile.content;
+
+  /* Fix: handle non-HTML files with no HTML base */
+  if (!baseFile) {
+    var content = activeFile.content;
+    var nl = activeFile.name.toLowerCase();
+    if (!content.trim()) {
+      return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{background:#1a1a1a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;color:#555;}</style></head><body><span>No content to preview</span></body></html>';
+    }
+    if (nl.endsWith('.css')) {
+      return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' + content + '</style></head><body></body></html>';
+    }
+    if (nl.endsWith('.js')) {
+      return '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><script>\n' + content + '\n<\/script></body></html>';
+    }
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><pre style="white-space:pre-wrap;word-break:break-all;padding:16px;font-family:monospace;">' + esc(content) + '</pre></body></html>';
+  }
 
   var htmlContent = baseFile.content;
+
+  /* Fix: if HTML file is empty show message */
+  if (!htmlContent.trim()) {
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{background:#1a1a1a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;color:#555;}</style></head><body><span>No content to preview</span></body></html>';
+  }
+
   var cssTags = '', jsTags = '';
-  for (var i = 0; i < files.length; i++) {
-    var file = files[i];
+  for (var j = 0; j < files.length; j++) {
+    var file = files[j];
     if (file.id === baseFile.id) continue;
     var nameLower = file.name.toLowerCase();
     if (nameLower.endsWith('.css')) { cssTags += '\n<style>\n' + file.content + '\n</style>\n'; }
     else if (nameLower.endsWith('.js')) { jsTags += '\n<script>\n' + file.content + '\n<\/script>\n'; }
   }
+
   var result = htmlContent;
-  if (cssTags) result = result.replace(/<\/head>/i, cssTags + '</head>');
-  if (jsTags) result = result.replace(/<\/body>/i, jsTags + '</body>');
+
+  /* Fix: robust injection — handle missing </head> and </body> tags */
+  if (cssTags) {
+    if (/<\/head>/i.test(result)) {
+      result = result.replace(/<\/head>/i, cssTags + '</head>');
+    } else if (/<head[^>]*>/i.test(result)) {
+      result = result.replace(/(<head[^>]*>)/i, '$1' + cssTags);
+    } else {
+      result = cssTags + result;
+    }
+  }
+  if (jsTags) {
+    if (/<\/body>/i.test(result)) {
+      result = result.replace(/<\/body>/i, jsTags + '</body>');
+    } else if (/<\/html>/i.test(result)) {
+      result = result.replace(/<\/html>/i, jsTags + '</html>');
+    } else {
+      result = result + jsTags;
+    }
+  }
   return result;
 }
 
 function openPreview(){
   var combinedHTML = buildMultiFilePreview();
-  previewFrame.srcdoc = combinedHTML;
   previewOverlay.classList.add('show');
+  /* Fix: small delay ensures overlay is visible before heavy srcdoc assignment */
+  requestAnimationFrame(function(){
+    previewFrame.srcdoc = combinedHTML;
+  });
 }
 function closePreviewFn(){
   previewOverlay.classList.remove('show');
@@ -896,6 +1056,7 @@ function renderEditor(){
   renderLineNums(f.content);
   updateBtns();
   lastCommit = f.content;
+  syncScroll();
 }
 
 /* ═══════════ INIT ═══════════ */
