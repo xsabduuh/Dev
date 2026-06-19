@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Code Editor – Universal Preview & Clean UI</title>
+<title>Code Editor – Final Layout</title>
 <style>
 /* ══════════════════════════════════════
-   STYLES
+   ALL STYLES – COMPLETE
 ══════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 :root{
@@ -78,11 +78,9 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 .fn{color:var(--blue);}
 .cls{color:var(--yel);}
 
-/* Toolbar (adjusted) */
-.toolbar{height:var(--tbh);background:var(--bg-s);border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;z-index:10;padding-bottom:10px;} /* ← رفع الأزرار قليلاً */
-.tb-inner{position:relative;display:flex;align-items:center;justify-content:space-between;width:100%;max-width:520px;padding:0 16px; gap: 12px;}
-.tb-group{display:flex;align-items:center;gap:8px;z-index:1;}
-.tb-center{display:flex;align-items:center;gap:10px;z-index:1;} /* لم يعد مطلق */
+/* Toolbar */
+.toolbar{height:var(--tbh);background:var(--bg-s);border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;z-index:10;padding-bottom:10px;}
+.tb-inner{position:relative;display:flex;align-items:center;width:100%;max-width:520px;padding:0 16px; gap:12px;}
 .ic-btn{width:38px;height:38px;border-radius:50%;background:var(--bg-card);border:1px solid var(--bhi);color:var(--fg2);display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s,transform .1s,border-color .12s;flex-shrink:0;}
 .ic-btn:hover:not(:disabled){background:var(--bg-hover);color:var(--fg);border-color:#444;}
 .ic-btn:active:not(:disabled){transform:scale(.9);}
@@ -134,7 +132,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 .save-del{width:28px;height:28px;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--fg2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .12s,color .12s;}
 .save-del:hover{background:rgba(255,83,112,.1);color:var(--red);border-color:rgba(255,83,112,.3);}
 
-/* Preview – Full Screen Overlay */
+/* Preview */
 .preview-overlay{position:fixed;inset:0;background:#000;z-index:800;display:none;align-items:center;justify-content:center;}
 .preview-overlay.show{display:flex;}
 .preview-frame{border:none;width:100%;height:100%;background:#000;}
@@ -180,93 +178,92 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 
   <footer class="toolbar">
     <div class="tb-inner">
-      <div class="tb-group">
-        <button class="ic-btn" id="undoBtn" title="Undo" disabled>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+      <!-- أقصى اليسار: القائمة -->
+      <div class="menu-wrap">
+        <button class="ic-btn" id="menuBtn" title="Options">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
           </svg>
         </button>
-        <button class="ic-btn" id="redoBtn" title="Redo" disabled>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/>
-          </svg>
-        </button>
-      </div>
-
-      <div class="tb-center">
-        <div class="sel-wrap">
-          <button class="ic-btn" id="selAllBtn" title="Select All">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
-            </svg>
+        <div class="dropdown" id="dropdown">
+          <button class="dd-item" id="saveBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+            </svg>Save Project
           </button>
-          <div class="copy-tip" id="copyTip">
-            <button class="copy-btn2" id="copyBtn">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>Copy
-            </button>
-            <button class="tip-dismiss" id="tipDismiss">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          <button class="dd-item danger" id="deleteBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>Delete Code
+          </button>
+          <button class="dd-item" id="renameBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>Rename
+          </button>
+          <div class="rename-row" id="renameRow">
+            <input class="rename-input" id="renameInput" type="text" placeholder="filename.js"/>
+            <button class="rename-ok" id="renameOk">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"/>
               </svg>
             </button>
           </div>
+          <div class="dd-sep"></div>
+          <button class="dd-item" id="addFileBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>Add New File
+          </button>
+          <div class="dd-sep"></div>
+          <button class="dd-item" id="openSavesBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>Saved Files
+          </button>
         </div>
       </div>
 
-      <div class="tb-group">
-        <div class="menu-wrap">
-          <button class="ic-btn" id="menuBtn" title="Options">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
+      <!-- المجموعة الوسطية: تقدم | تحديد الكل | رجوع -->
+      <div style="display:flex; align-items:center; gap:10px; flex-grow:1; justify-content:center;">
+          <button class="ic-btn" id="redoBtn" title="Redo" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/>
             </svg>
           </button>
-          <div class="dropdown" id="dropdown">
-            <button class="dd-item" id="saveBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-              </svg>Save Project
+
+          <div class="sel-wrap">
+            <button class="ic-btn" id="selAllBtn" title="Select All">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+              </svg>
             </button>
-            <button class="dd-item danger" id="deleteBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                <path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-              </svg>Delete Code
-            </button>
-            <button class="dd-item" id="renameBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-              </svg>Rename
-            </button>
-            <div class="rename-row" id="renameRow">
-              <input class="rename-input" id="renameInput" type="text" placeholder="filename.js"/>
-              <button class="rename-ok" id="renameOk">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <polyline points="20 6 9 17 4 12"/>
+            <div class="copy-tip" id="copyTip">
+              <button class="copy-btn2" id="copyBtn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>Copy
+              </button>
+              <button class="tip-dismiss" id="tipDismiss">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>
             </div>
-            <div class="dd-sep"></div>
-            <button class="dd-item" id="addFileBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
-              </svg>Add New File
-            </button>
-            <div class="dd-sep"></div>
-            <button class="dd-item" id="openSavesBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-              </svg>Saved Files
-            </button>
           </div>
-        </div>
+
+          <button class="ic-btn" id="undoBtn" title="Undo" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+            </svg>
+          </button>
       </div>
     </div>
   </footer>
@@ -336,44 +333,28 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 (function(){
 'use strict';
 
-/* ══════════════════════════════════════
-   DATA MIGRATION SYSTEM
-══════════════════════════════════════ */
+/* ═══════════ MIGRATION ═══════════ */
 var DATA_VERSION = 2;
-
 function migrateData() {
-  var versionKey = 'ce_saves_version';
-  var dataKey = 'ce_saves_v1';
-
+  var versionKey = 'ce_saves_version', dataKey = 'ce_saves_v1';
   var storedVersion = localStorage.getItem(versionKey);
   var currentVersion = parseInt(storedVersion, 10) || 0;
-
   if (currentVersion < 2 && localStorage.getItem(dataKey)) {
     try {
       var oldData = JSON.parse(localStorage.getItem(dataKey) || '[]');
       var newData = oldData.map(function(item) {
-        if (!item.type) {
-          if (item.files) {
-            item.type = 'project';
-          } else {
-            item.type = 'file';
-          }
-        }
+        if (!item.type) { item.type = item.files ? 'project' : 'file'; }
         return item;
       });
       localStorage.setItem(dataKey, JSON.stringify(newData));
     } catch(e) {}
     currentVersion = 2;
   }
-
   localStorage.setItem(versionKey, currentVersion);
 }
-
 migrateData();
 
-/* ══════════════════════════════════════
-   HIGHLIGHTER
-══════════════════════════════════════ */
+/* ═══════════ HIGHLIGHTER ═══════════ */
 var KW=new Set(['const','let','var','function','return','if','else','for','while','do',
   'switch','case','break','continue','new','delete','typeof','instanceof','in','of',
   'class','extends','import','export','default','async','await','try','catch','finally',
@@ -396,9 +377,7 @@ function highlight(code){
   return out.join('');
 }
 
-/* ══════════════════════════════════════
-   STATE
-══════════════════════════════════════ */
+/* ═══════════ STATE ═══════════ */
 var files=[{id:1,name:'index.html',content:''}];
 var activeId=1,nextId=2;
 var undoSt={1:[]},redoSt={1:[]};
@@ -409,9 +388,7 @@ var editingTabId = null;
 function getFile(){for(var k=0;k<files.length;k++)if(files[k].id===activeId)return files[k];return files[0];}
 function findFileByName(name){for(var i=0;i<files.length;i++){if(files[i].name===name)return files[i];}return null;}
 
-/* ══════════════════════════════════════
-   DOM
-══════════════════════════════════════ */
+/* ═══════════ DOM ═══════════ */
 var tabsBar=document.getElementById('tabsBar');
 var lineNums=document.getElementById('lineNums');
 var hlLayer=document.getElementById('hlLayer');
@@ -441,9 +418,7 @@ var previewFrame=document.getElementById('previewFrame');
 var closePreview=document.getElementById('closePreview');
 var toastEl=document.getElementById('toast');
 
-/* ══════════════════════════════════════
-   TOAST
-══════════════════════════════════════ */
+/* ═══════════ TOAST ═══════════ */
 var toastTimer=null;
 function showToast(msg){
   toastEl.textContent=msg;
@@ -452,9 +427,7 @@ function showToast(msg){
   toastTimer=setTimeout(function(){toastEl.classList.remove('show');},2200);
 }
 
-/* ══════════════════════════════════════
-   RENDER
-══════════════════════════════════════ */
+/* ═══════════ RENDER ═══════════ */
 function renderLineNums(text){
   var n = (text.match(/\n/g)||[]).length + 1;
   var h='';
@@ -548,9 +521,7 @@ function renderTabs(){
   }
 }
 
-/* ══════════════════════════════════════
-   TABS
-══════════════════════════════════════ */
+/* ═══════════ TABS ═══════════ */
 function switchTab(id){
   commitUndo();
   activeId=id;
@@ -570,14 +541,11 @@ function closeTab(id){
   renderTabs();renderEditor();
 }
 
-/* ══════════════════════════════════════
-   INLINE TAB RENAME
-══════════════════════════════════════ */
+/* ═══════════ INLINE RENAME ═══════════ */
 function startEditTabName(id){
   editingTabId = id;
   renderTabs();
 }
-
 function finishRename(newName, id){
   if(editingTabId !== id) return;
   newName = (newName || '').trim();
@@ -589,15 +557,12 @@ function finishRename(newName, id){
   editingTabId = null;
   renderTabs();
 }
-
 function cancelRename(){
   editingTabId = null;
   renderTabs();
 }
 
-/* ══════════════════════════════════════
-   SMART PASTE DETECTION
-══════════════════════════════════════ */
+/* ═══════════ SMART PASTE RENAME (for any file) ═══════════ */
 function detectLanguage(content) {
   if (/^\s*<!DOCTYPE html>/i.test(content) || /<html[\s>]/i.test(content) || /<head[\s>]/i.test(content) || /<body[\s>]/i.test(content)) {
     return 'html';
@@ -613,27 +578,31 @@ function detectLanguage(content) {
 
 function autoRenameAfterPaste() {
   var f = getFile();
-  var nameLower = f.name.toLowerCase();
-  var isDefault = (nameLower === 'index.html') || /^file\d+\.(js|css|html)$/i.test(f.name) || nameLower === 'style.css' || nameLower === 'script.js';
-  if (!isDefault) return;
-
   var content = f.content;
   if (!content.trim()) return;
 
   var lang = detectLanguage(content);
   if (!lang) return;
 
-  var newName;
-  if (lang === 'html') newName = 'index.html';
-  else if (lang === 'css') newName = 'style.css';
-  else if (lang === 'javascript') newName = 'script.js';
-  else return;
+  var ext = (lang === 'html') ? '.html' : (lang === 'css' ? '.css' : '.js');
+  var currentName = f.name;
+  var currentLower = currentName.toLowerCase();
 
-  if (f.name === newName) return;
+  // إذا كان الامتداد صحيحاً بالفعل، لا نغير الاسم
+  if (currentLower.endsWith(ext)) return;
+
+  // توليد اسم جديد: untitled مع الامتداد، وزيادة رقم إذا كان موجوداً
+  var baseName = 'untitled' + ext;
+  var counter = 1;
+  var newName = baseName;
+  while (files.some(function(file){ return file.name.toLowerCase() === newName.toLowerCase(); })) {
+    newName = 'untitled' + counter + ext;
+    counter++;
+  }
 
   f.name = newName;
   renderTabs();
-  showToast('Renamed to ' + newName + ' (based on content)');
+  showToast('Renamed to ' + newName + ' (auto-detected)');
 }
 
 codeArea.addEventListener('paste', function() {
@@ -642,9 +611,7 @@ codeArea.addEventListener('paste', function() {
   }, 50);
 });
 
-/* ══════════════════════════════════════
-   UNDO / REDO
-══════════════════════════════════════ */
+/* ═══════════ UNDO / REDO ═══════════ */
 function initSt(id){if(!undoSt[id])undoSt[id]=[];if(!redoSt[id])redoSt[id]=[];}
 function pushUndo(snap){
   initSt(activeId);
@@ -681,9 +648,7 @@ function doRedo(){
   applyContent(next);lastCommit=next;
 }
 
-/* ══════════════════════════════════════
-   TEXTAREA EVENTS
-══════════════════════════════════════ */
+/* ═══════════ TEXTAREA EVENTS ═══════════ */
 codeArea.addEventListener('input',function(){
   var val=codeArea.value;
   for(var k=0;k<files.length;k++)if(files[k].id===activeId){files[k].content=val;break;}
@@ -714,9 +679,7 @@ codeArea.addEventListener('keydown',function(e){
   if((e.ctrlKey||e.metaKey)&&e.key==='a'){setTimeout(function(){copyTip.classList.add('show');},50);}
 });
 
-/* ══════════════════════════════════════
-   TOOLBAR BUTTONS
-══════════════════════════════════════ */
+/* ═══════════ TOOLBAR BUTTONS ═══════════ */
 undoBtn.addEventListener('click',doUndo);
 redoBtn.addEventListener('click',doRedo);
 selAllBtn.addEventListener('click',function(){codeArea.focus();codeArea.select();copyTip.classList.add('show');});
@@ -732,99 +695,55 @@ function fbCopy(t){var ta=document.createElement('textarea');ta.value=t;ta.style
 tipDismiss.addEventListener('click',function(){copyTip.classList.remove('show');});
 document.addEventListener('mousedown',function(e){if(!copyTip.contains(e.target)&&e.target!==selAllBtn)copyTip.classList.remove('show');});
 
-/* ══════════════════════════════════════
-   DROPDOWN
-══════════════════════════════════════ */
+/* ═══════════ DROPDOWN ═══════════ */
 function closeDropdown(){dropdown.classList.remove('show');renameRow.classList.remove('show');renameBtn.style.display='';}
 menuBtn.addEventListener('click',function(e){e.stopPropagation();var o=dropdown.classList.toggle('show');if(!o){renameRow.classList.remove('show');renameBtn.style.display='';}});
 document.addEventListener('mousedown',function(e){if(!dropdown.contains(e.target)&&e.target!==menuBtn)closeDropdown();});
 
-/* ══════════════════════════════════════
-   PROJECT SAVE
-══════════════════════════════════════ */
+/* ═══════════ PROJECT SAVE ═══════════ */
 var LS_KEY='ce_saves_v1';
-
-function getSaves(){
-  try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){return[];}
-}
-function setSaves(arr){
-  try{localStorage.setItem(LS_KEY,JSON.stringify(arr));}catch(e){showToast('Storage full!');}
-}
+function getSaves(){ try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){return[];} }
+function setSaves(arr){ try{localStorage.setItem(LS_KEY,JSON.stringify(arr));}catch(e){showToast('Storage full!');} }
 
 function doSave(){
   var projectName = prompt('Enter a name for your project:', 'MyProject');
-  if (!projectName || !projectName.trim()) {
-    showToast('Save cancelled');
-    closeDropdown();
-    return;
-  }
+  if (!projectName || !projectName.trim()) { showToast('Save cancelled'); closeDropdown(); return; }
   projectName = projectName.trim();
-
   var arr = getSaves();
   var now = new Date();
   var label = now.toLocaleDateString('en',{month:'short',day:'numeric'})+' '+now.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
-  
-  var projectFiles = files.map(function(f) {
-    return { id: f.id, name: f.name, content: f.content };
-  });
-
-  var projectEntry = {
-    id: 'proj_'+Date.now(),
-    type: 'project',
-    name: projectName,
-    files: projectFiles,
-    date: label
-  };
-
+  var projectFiles = files.map(function(f){ return { id:f.id, name:f.name, content:f.content }; });
+  var projectEntry = { id:'proj_'+Date.now(), type:'project', name:projectName, files:projectFiles, date:label };
   arr.unshift(projectEntry);
   if(arr.length > 50) arr = arr.slice(0, 50);
   setSaves(arr);
   showToast('Project saved: ' + projectName);
   closeDropdown();
 }
-
 saveBtn.addEventListener('click', doSave);
 
-/* ══════════════════════════════════════
-   SAVED FILES PANEL
-══════════════════════════════════════ */
+/* ═══════════ SAVED FILES PANEL ═══════════ */
 function renderSavesList() {
   var arr = getSaves();
-  if(!arr.length) {
-    savesList.innerHTML = '<div class="save-empty">No saved files or projects.<br>Use <strong>Save Project</strong> to save all tabs.</div>';
-    return;
-  }
+  if(!arr.length) { savesList.innerHTML = '<div class="save-empty">No saved files or projects.<br>Use <strong>Save Project</strong> to save all tabs.</div>'; return; }
   var html = '';
   arr.forEach(function(s) {
     var isProject = (s.type === 'project');
-    var iconSvg = isProject 
+    var iconSvg = isProject
       ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#82aaff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polyline points="17 8 12 13 8 10"/></svg>'
       : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c792ea" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
-    
     var nameDisplay = esc(s.name);
     if (isProject) nameDisplay += ' <span style="color:#82aaff;font-size:11px;">[Project]</span>';
-
-    html +=
-      '<div class="save-card" data-id="'+s.id+'">'
+    html += '<div class="save-card" data-id="'+s.id+'">'
       +'<div class="save-icon">'+iconSvg+'</div>'
-      +'<div class="save-info">'
-      +'<div class="save-name">'+nameDisplay+'</div>'
-      +'<div class="save-date">'+esc(s.date)+'</div>'
-      +'</div>'
+      +'<div class="save-info"><div class="save-name">'+nameDisplay+'</div><div class="save-date">'+esc(s.date)+'</div></div>'
       +'<div class="save-actions">'
       +'<button class="save-load" data-load="'+s.id+'">Load</button>'
-      +'<button class="save-del" data-del="'+s.id+'" title="Delete">'
-      +'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-      +'<polyline points="3 6 5 6 21 6"/>'
-      +'<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'
-      +'</svg>'
-      +'</button>'
-      +'</div>'
-      +'</div>';
+      +'<button class="save-del" data-del="'+s.id+'" title="Delete"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>'
+      +'</div></div>';
   });
   savesList.innerHTML = html;
 
-  // تحميل
   savesList.querySelectorAll('[data-load]').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var id = this.getAttribute('data-load');
@@ -834,19 +753,13 @@ function renderSavesList() {
           var item = arr2[i];
           if(item.type === 'project' && item.files) {
             commitUndo();
-            files = item.files.map(function(f) {
-              return { id: f.id, name: f.name, content: f.content };
-            });
+            files = item.files.map(function(f){ return { id:f.id, name:f.name, content:f.content }; });
             undoSt = {}; redoSt = {};
-            files.forEach(function(f) {
-              undoSt[f.id] = [];
-              redoSt[f.id] = [];
-            });
+            files.forEach(function(f){ undoSt[f.id] = []; redoSt[f.id] = []; });
             activeId = files[0].id;
             nextId = Math.max.apply(null, files.map(function(f){return f.id;})) + 1;
             editingTabId = null;
-            renderTabs();
-            renderEditor();
+            renderTabs(); renderEditor();
           } else {
             commitUndo();
             getFile().name = item.name;
@@ -862,7 +775,6 @@ function renderSavesList() {
     });
   });
 
-  // حذف مع تأكيد
   savesList.querySelectorAll('[data-del]').forEach(function(btn) {
     btn.addEventListener('click', function() {
       if (confirm('Are you sure you want to delete this saved item?')) {
@@ -875,17 +787,10 @@ function renderSavesList() {
     });
   });
 }
+openSavesBtn.addEventListener('click',function(){ closeDropdown(); renderSavesList(); savesPanel.classList.add('show'); });
+savesClose.addEventListener('click',function(){ savesPanel.classList.remove('show'); });
 
-openSavesBtn.addEventListener('click',function(){
-  closeDropdown();
-  renderSavesList();
-  savesPanel.classList.add('show');
-});
-savesClose.addEventListener('click',function(){savesPanel.classList.remove('show');});
-
-/* ══════════════════════════════════════
-   DELETE / RENAME / ADD FILE
-══════════════════════════════════════ */
+/* ═══════════ DELETE / RENAME / ADD FILE ═══════════ */
 deleteBtn.addEventListener('click',function(){
   commitUndo();
   applyContent('');
@@ -904,66 +809,38 @@ addFileBtn.addEventListener('click',function(){
   var id = nextId++;
   var name = 'file'+id+'.js';
   files.push({id:id, name:name, content:''});
-  undoSt[id] = [];
-  redoSt[id] = [];
+  undoSt[id] = []; redoSt[id] = [];
   activeId = id;
   editingTabId = null;
-  renderTabs();
-  renderEditor();
+  renderTabs(); renderEditor();
   closeDropdown();
   codeArea.focus();
 });
 
-/* ══════════════════════════════════════
-   UNIVERSAL MULTI-FILE PREVIEW
-══════════════════════════════════════ */
+/* ═══════════ UNIVERSAL MULTI-FILE PREVIEW ═══════════ */
 function buildMultiFilePreview(){
-  // البحث عن ملف HTML ليكون الأساس
   var activeFile = getFile();
   var baseFile = null;
-
-  if (/\.html$/i.test(activeFile.name)) {
-    baseFile = activeFile;
-  } else {
-    // ابحث عن أول ملف HTML في التبويبات
+  if (/\.html$/i.test(activeFile.name)) { baseFile = activeFile; }
+  else {
     for (var i = 0; i < files.length; i++) {
-      if (/\.html$/i.test(files[i].name)) {
-        baseFile = files[i];
-        break;
-      }
+      if (/\.html$/i.test(files[i].name)) { baseFile = files[i]; break; }
     }
   }
+  if (!baseFile) return activeFile.content;
 
-  // إذا لم يوجد أي ملف HTML، اعرض محتوى التبويب الحالي كما هو
-  if (!baseFile) {
-    return activeFile.content;
-  }
-
-  // بناء محتوى الصفحة
   var htmlContent = baseFile.content;
-  var cssTags = '';
-  var jsTags = '';
-
+  var cssTags = '', jsTags = '';
   for (var i = 0; i < files.length; i++) {
     var file = files[i];
-    if (file.id === baseFile.id) continue; // تخطي الأساس
+    if (file.id === baseFile.id) continue;
     var nameLower = file.name.toLowerCase();
-    if (nameLower.endsWith('.css')) {
-      cssTags += '\n<style>\n' + file.content + '\n</style>\n';
-    } else if (nameLower.endsWith('.js')) {
-      jsTags += '\n<script>\n' + file.content + '\n<\/script>\n';
-    }
+    if (nameLower.endsWith('.css')) { cssTags += '\n<style>\n' + file.content + '\n</style>\n'; }
+    else if (nameLower.endsWith('.js')) { jsTags += '\n<script>\n' + file.content + '\n<\/script>\n'; }
   }
-
-  // حقن الوسوم
   var result = htmlContent;
-  if (cssTags) {
-    result = result.replace(/<\/head>/i, cssTags + '</head>');
-  }
-  if (jsTags) {
-    result = result.replace(/<\/body>/i, jsTags + '</body>');
-  }
-
+  if (cssTags) result = result.replace(/<\/head>/i, cssTags + '</head>');
+  if (jsTags) result = result.replace(/<\/body>/i, jsTags + '</body>');
   return result;
 }
 
@@ -972,30 +849,24 @@ function openPreview(){
   previewFrame.srcdoc = combinedHTML;
   previewOverlay.classList.add('show');
 }
-
 function closePreviewFn(){
   previewOverlay.classList.remove('show');
   previewFrame.srcdoc = '';
 }
-
 playBtn.addEventListener('click', openPreview);
 closePreview.addEventListener('click', closePreviewFn);
-previewOverlay.addEventListener('click', function(e){
-  if(e.target === previewOverlay) closePreviewFn();
-});
+previewOverlay.addEventListener('click', function(e){ if(e.target === previewOverlay) closePreviewFn(); });
 
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
-    if(savesPanel.classList.contains('show')){savesPanel.classList.remove('show');return;}
-    if(previewOverlay.classList.contains('show')){closePreviewFn();return;}
+    if(savesPanel.classList.contains('show')){ savesPanel.classList.remove('show'); return; }
+    if(previewOverlay.classList.contains('show')){ closePreviewFn(); return; }
     if(editingTabId !== null){ cancelRename(); return; }
     closeDropdown();
   }
 });
 
-/* ══════════════════════════════════════
-   RENDER EDITOR
-══════════════════════════════════════ */
+/* ═══════════ RENDER EDITOR ═══════════ */
 function renderEditor(){
   var f = getFile();
   codeArea.value = f.content;
@@ -1005,9 +876,7 @@ function renderEditor(){
   lastCommit = f.content;
 }
 
-/* ══════════════════════════════════════
-   INIT
-══════════════════════════════════════ */
+/* ═══════════ INIT ═══════════ */
 renderTabs();
 renderEditor();
 
