@@ -3,11 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Code Editor – Preview Fix & Scroll Top</title>
+<title>Code Editor – Preview Fix</title>
 <style>
-/* ══════════════════════════════════════
-   ALL STYLES – COMPLETE
-══════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 :root{
   --bg:#000;--bg-s:#0a0a0a;--bg-card:#111;--bg-hover:#1a1a1a;--bg-menu:#141414;
@@ -133,9 +130,9 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 .save-del:hover{background:rgba(255,83,112,.1);color:var(--red);border-color:rgba(255,83,112,.3);}
 
 /* Preview – Full Screen Overlay */
-.preview-overlay{position:fixed;inset:0;background:#000;z-index:800;display:none;align-items:center;justify-content:center;}
+.preview-overlay{position:fixed;inset:0;background:#000;z-index:800;display:none;}
 .preview-overlay.show{display:block;}
-.preview-frame{border:none;width:100%;height:100%;background:#000;}
+.preview-frame{position:absolute;top:0;left:0;width:100%;height:100%;border:none;background:#000;}
 .preview-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(20,20,20,.9);border:1px solid var(--bhi);color:var(--fg2);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:810;transition:background .12s,color .12s,border-color .12s;}
 .preview-close:hover{background:rgba(255,83,112,.2);color:var(--red);border-color:rgba(255,83,112,.4);}
 
