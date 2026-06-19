@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Code Editor – Scrollable Tabs & Fixed Close</title>
+<title>Code Editor – Preview Fix & Scroll Top</title>
 <style>
 /* ══════════════════════════════════════
    ALL STYLES – COMPLETE
@@ -34,7 +34,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 .play-btn svg{margin-left:2px;display:block;}
 
 /* Tabs */
-.tabs-bar{display:flex;align-items:stretch;height:var(--th);background:var(--bg-s);border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:hidden;flex-shrink:0;scrollbar-width:none;touch-action:pan-x; /* يسمح بالتمرير الأفقي */ }
+.tabs-bar{display:flex;align-items:stretch;height:var(--th);background:var(--bg-s);border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:hidden;flex-shrink:0;scrollbar-width:none;touch-action:pan-x;}
 .tabs-bar::-webkit-scrollbar{display:none;}
 .tab{display:inline-flex;align-items:center;gap:7px;padding:0 14px;height:100%;background:transparent;border:none;border-right:1px solid var(--border);color:var(--fg2);font-family:var(--mono);font-size:12px;white-space:nowrap;flex-shrink:0;cursor:pointer;transition:color .12s,background .12s;position:relative;}
 .tab:hover{color:var(--fg);background:var(--bg-hover);}
@@ -132,9 +132,10 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 .save-del{width:28px;height:28px;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--fg2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .12s,color .12s;}
 .save-del:hover{background:rgba(255,83,112,.1);color:var(--red);border-color:rgba(255,83,112,.3);}
 
-/* Preview */
+/* Preview – Full Screen Overlay */
 .preview-overlay{position:fixed;inset:0;background:#000;z-index:800;display:none;align-items:center;justify-content:center;}
-.preview-overlay.show{display:flex;}
+/* الإصلاح: عدم استخدام flex كي لا ينكمش الـ iframe */
+.preview-overlay.show{display:block;}
 .preview-frame{border:none;width:100%;height:100%;background:#000;}
 .preview-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(20,20,20,.9);border:1px solid var(--bhi);color:var(--fg2);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:810;transition:background .12s,color .12s,border-color .12s;}
 .preview-close:hover{background:rgba(255,83,112,.2);color:var(--red);border-color:rgba(255,83,112,.4);}
@@ -178,7 +179,6 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 
   <footer class="toolbar">
     <div class="tb-inner">
-      <!-- ترتيب الأزرار: Undo | Select All | Redo | Menu -->
       <div style="display:flex; align-items:center; gap:10px;">
         <button class="ic-btn" id="undoBtn" title="Undo" disabled>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -297,6 +297,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 <script>
 /* =========================================================
    ⚠️ تنبيه هام للمطورين والذكاء الاصطناعي ⚠️
+   (نظام الترقية - كما هو)
    ========================================================= */
 (function(){
 'use strict';
@@ -459,7 +460,6 @@ function renderTabs(){
           if (f.id === activeId) {
             startEditTabName(f.id);
           }
-          // prevent click
           e.preventDefault();
         } else {
           longPressed = false;
@@ -472,7 +472,6 @@ function renderTabs(){
         longPressed = false;
       }
 
-      // For mouse
       btn.addEventListener('mousedown', function(e) {
         if (editingTabId !== null) return;
         pressStartTime = Date.now();
@@ -493,20 +492,17 @@ function renderTabs(){
       });
       btn.addEventListener('mouseleave', function() { pressStartTime = 0; });
 
-      // Touch events
       btn.addEventListener('touchstart', onTouchStart, {passive: true});
       btn.addEventListener('touchend', onTouchEnd, {passive: false});
       btn.addEventListener('touchcancel', onTouchCancel, {passive: true});
 
-      // Click handler: switch tab if not long press and not on close button
       btn.addEventListener('click', function(e) {
         if (editingTabId !== null) return;
         if (longPressed) {
-          // ignore
           longPressed = false;
           return;
         }
-        if (e.target.closest('.tab-x')) return; // ignore close button clicks
+        if (e.target.closest('.tab-x')) return;
         if (f.id !== activeId) {
           switchTab(f.id);
         }
@@ -597,7 +593,14 @@ function autoRenameAfterPaste() {
 }
 
 codeArea.addEventListener('paste', function() {
-  setTimeout(autoRenameAfterPaste, 50);
+  setTimeout(function() {
+    // إصلاح: إعادة التمرير إلى الأعلى بعد اللصق
+    codeArea.scrollTop = 0;
+    // مزامنة الطبقات الأخرى
+    hlLayer.scrollTop = 0;
+    lineNums.scrollTop = 0;
+    autoRenameAfterPaste();
+  }, 10);
 });
 
 /* ═══════════ UNDO / REDO ═══════════ */
