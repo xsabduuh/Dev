@@ -343,6 +343,7 @@ var activeId=1,nextId=2;
 var undoSt={1:[]},redoSt={1:[]};
 var lastCommit=files[0].content;
 var undoTimer=null;
+var editingTabId = null; // <<< NEW: for inline tab rename
 
 function getFile(){for(var k=0;k<files.length;k++)if(files[k].id===activeId)return files[k];return files[0];}
 function findFileByName(name){for(var i=0;i<files.length;i++){if(files[i].name===name)return files[i];}return null;}
@@ -410,37 +411,100 @@ function renderTabs(){
     (function(f){
       var btn=document.createElement('button');
       btn.className='tab'+(f.id===activeId?' active':'');
-      var sp=document.createElement('span');sp.textContent=f.name;btn.appendChild(sp);
+      
+      // إذا كان هذا التبويب في وضع التحرير
+      if(f.id === editingTabId){
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'tab-rename-input';
+        input.value = f.name;
+        input.style.cssText = 'background:transparent; border:none; outline:none; color:inherit; font:inherit; width:100%; padding:0; margin:0;';
+        
+        input.addEventListener('keydown', function(e){
+          e.stopPropagation();
+          if(e.key === 'Enter') finishRename(input.value.trim(), f.id);
+          if(e.key === 'Escape') cancelRename();
+        });
+        
+        input.addEventListener('blur', function(){
+          finishRename(input.value.trim(), f.id);
+        });
+        
+        btn.appendChild(input);
+        // تأخير التركيز حتى يتم الإدراج في DOM
+        setTimeout(function(){ input.focus(); input.select(); }, 20);
+      } else {
+        var sp=document.createElement('span');sp.textContent=f.name;btn.appendChild(sp);
+      }
+      
       if(files.length>1){
         var x=document.createElement('button');x.className='tab-x';x.title='Close';
         x.innerHTML='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
         x.addEventListener('click',function(e){e.stopPropagation();closeTab(f.id);});
         btn.appendChild(x);
       }
-      btn.addEventListener('click',function(){switchTab(f.id);});
+      
+      btn.addEventListener('click',function(e){
+        // لو كان هناك حقل تحرير مفتوح، لا تفعل شيء (تمنع التبديل)
+        if(editingTabId !== null) return;
+        if(f.id === activeId){
+          // التبويب نشط: بدء تحرير الاسم
+          startEditTabName(f.id);
+        } else {
+          switchTab(f.id);
+        }
+      });
+      
       tabsBar.appendChild(btn);
     })(files[i]);
   }
-}
-function renderEditor(){
-  var f=getFile();
-  codeArea.value=f.content;
-  renderHL(f.content);
-  renderLineNums(f.content);
-  updateBtns();
-  lastCommit=f.content;
 }
 
 /* ══════════════════════════════════════
    TABS
 ══════════════════════════════════════ */
-function switchTab(id){commitUndo();activeId=id;renderTabs();renderEditor();closeDropdown();copyTip.classList.remove('show');}
+function switchTab(id){
+  commitUndo();
+  activeId=id;
+  editingTabId = null; // إلغاء أي تحرير سابق
+  renderTabs();
+  renderEditor();
+  closeDropdown();
+  copyTip.classList.remove('show');
+}
+
 function closeTab(id){
   if(files.length===1)return;
+  if(editingTabId === id) editingTabId = null;
   files=files.filter(function(f){return f.id!==id;});
   delete undoSt[id];delete redoSt[id];
   if(activeId===id)activeId=files[files.length-1].id;
   renderTabs();renderEditor();
+}
+
+/* ══════════════════════════════════════
+   INLINE TAB RENAME
+══════════════════════════════════════ */
+function startEditTabName(id){
+  editingTabId = id;
+  renderTabs();
+}
+
+function finishRename(newName, id){
+  if(editingTabId !== id) return;
+  newName = (newName || '').trim();
+  if(newName){
+    for(var k=0;k<files.length;k++){
+      if(files[k].id === id){ files[k].name = newName; break; }
+    }
+  }
+  editingTabId = null;
+  renderTabs();
+}
+
+function cancelRename(){
+  editingTabId = null;
+  renderTabs();
 }
 
 /* ══════════════════════════════════════
@@ -635,25 +699,18 @@ deleteBtn.addEventListener('click',function(){
 
 renameBtn.addEventListener('click',function(e){
   e.stopPropagation();
-  renameInput.value=getFile().name;
-  renameRow.classList.add('show');
-  renameBtn.style.display='none';
-  setTimeout(function(){renameInput.focus();renameInput.select();},80);
-});
-function doRename(){
-  var v=renameInput.value.trim();
-  if(v){for(var k=0;k<files.length;k++)if(files[k].id===activeId){files[k].name=v;break;}renderTabs();}
-  renameRow.classList.remove('show');renameBtn.style.display='';
+  // نستخدم التحرير المباشر من التبويب
+  startEditTabName(activeId);
   closeDropdown();
-}
-renameOk.addEventListener('click',doRename);
-renameInput.addEventListener('keydown',function(e){if(e.key==='Enter')doRename();if(e.key==='Escape'){renameRow.classList.remove('show');renameBtn.style.display='';}});
+});
+// تم إزالة دوال renameRow السابقة لأننا نعتمد على التحرير المباشر
 
 addFileBtn.addEventListener('click',function(){
   var id=nextId++,name='file'+id+'.js';
   files.push({id:id,name:name,content:'// New file\n'});
   undoSt[id]=[];redoSt[id]=[];
   commitUndo();activeId=id;
+  editingTabId = null;
   renderTabs();renderEditor();lastCommit='// New file\n';
   closeDropdown();codeArea.focus();
 });
@@ -666,24 +723,20 @@ function buildMultiFilePreview(){
   var cssFile = findFileByName('style.css');
   var jsFile = findFileByName('script.js');
 
-  // إن لم يوجد index.html نعرض محتوى التبويب الحالي كما هو
   if (!htmlFile) return getFile().content;
 
   var htmlContent = htmlFile.content;
 
-  // تجهيز وسم CSS إن وجد
   var cssTag = '';
   if (cssFile && cssFile.content.trim()) {
     cssTag = '\n<style>\n' + cssFile.content + '\n</style>';
   }
 
-  // تجهيز وسم JS إن وجد
   var jsTag = '';
   if (jsFile && jsFile.content.trim()) {
     jsTag = '\n<script>\n' + jsFile.content + '\n</' + 'script>';
   }
 
-  // حقن CSS قبل </head> و JS قبل </body>
   var result = htmlContent
     .replace(/<\/head>/i, cssTag + '\n</head>')
     .replace(/<\/body>/i, jsTag + '\n</body>');
@@ -712,6 +765,7 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
     if(savesPanel.classList.contains('show')){savesPanel.classList.remove('show');return;}
     if(previewOverlay.classList.contains('show')){closePreviewFn();return;}
+    if(editingTabId !== null){ cancelRename(); return; }
     closeDropdown();
   }
 });
