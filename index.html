@@ -410,7 +410,7 @@ function highlight(code){
 var files=[{id:1,name:'index.html',content:''}];
 var activeId=1,nextId=2;
 var undoSt={1:[]},redoSt={1:[]};
-var lastCommit=files[0].content;
+var lastCommit='';
 var undoTimer=null;
 var editingTabId = null;
 
@@ -465,7 +465,10 @@ function showToast(msg){
    RENDER
 ══════════════════════════════════════ */
 function renderLineNums(text){
-  if (!text) { lineNums.innerHTML = ''; return; }
+  if (!text || text === '') {
+    lineNums.innerHTML = '';
+    return;
+  }
   var n=(text.match(/\n/g)||[]).length+1,h='';
   for(var i=1;i<=n;i++)h+='<div class="ln">'+i+'</div>';
   lineNums.innerHTML=h;
@@ -631,11 +634,17 @@ function pushUndo(snap){
 function commitUndo(){
   clearTimeout(undoTimer);
   var cur=codeArea.value;
-  if(cur!==lastCommit){pushUndo(lastCommit);lastCommit=cur;}
+  if(cur !== lastCommit){
+    pushUndo(lastCommit);
+    lastCommit = cur;
+  }
 }
 function applyContent(val){
   for(var k=0;k<files.length;k++)if(files[k].id===activeId){files[k].content=val;break;}
-  codeArea.value=val;renderHL(val);renderLineNums(val);updateBtns();
+  codeArea.value = val;
+  renderHL(val);
+  renderLineNums(val);
+  updateBtns();
 }
 function doUndo(){
   commitUndo();initSt(activeId);
@@ -803,6 +812,7 @@ function renderSavesList() {
         if(arr2[i].id === id) {
           var item = arr2[i];
           if(item.type === 'project' && item.files) {
+            // تحميل مشروع
             commitUndo();
             files = item.files.map(function(f) {
               return { id: f.id, name: f.name, content: f.content };
@@ -814,7 +824,6 @@ function renderSavesList() {
             });
             activeId = files[0].id;
             nextId = Math.max.apply(null, files.map(function(f){return f.id;})) + 1;
-            lastCommit = files[0].content;
             editingTabId = null;
             renderTabs();
             renderEditor();
@@ -822,7 +831,6 @@ function renderSavesList() {
             // تحميل ملف واحد
             commitUndo();
             getFile().name = item.name;
-            pushUndo(getFile().content);
             applyContent(item.content);
             lastCommit = item.content;
             renderTabs();
@@ -858,8 +866,10 @@ savesClose.addEventListener('click',function(){savesPanel.classList.remove('show
    DELETE / RENAME / ADD FILE
 ══════════════════════════════════════ */
 deleteBtn.addEventListener('click',function(){
-  commitUndo();pushUndo(getFile().content);
-  applyContent('');lastCommit='';closeDropdown();
+  commitUndo();
+  applyContent('');
+  lastCommit = '';
+  closeDropdown();
   showToast('Code cleared');
 });
 
@@ -870,13 +880,17 @@ renameBtn.addEventListener('click',function(e){
 });
 
 addFileBtn.addEventListener('click',function(){
-  var id=nextId++,name='file'+id+'.js';
-  files.push({id:id,name:name,content:''});  // محتوى فارغ الآن
-  undoSt[id]=[];redoSt[id]=[];
-  commitUndo();activeId=id;
+  var id = nextId++;
+  var name = 'file'+id+'.js';
+  files.push({id:id, name:name, content:''});
+  undoSt[id] = [];
+  redoSt[id] = [];
+  activeId = id;
   editingTabId = null;
-  renderTabs();renderEditor();lastCommit='';
-  closeDropdown();codeArea.focus();
+  renderTabs();
+  renderEditor();
+  closeDropdown();
+  codeArea.focus();
 });
 
 /* ══════════════════════════════════════
@@ -933,6 +947,18 @@ document.addEventListener('keydown',function(e){
     closeDropdown();
   }
 });
+
+/* ══════════════════════════════════════
+   RENDER EDITOR (محسن)
+══════════════════════════════════════ */
+function renderEditor(){
+  var f = getFile();
+  codeArea.value = f.content;
+  renderHL(f.content);
+  renderLineNums(f.content);
+  updateBtns();
+  lastCommit = f.content;
+}
 
 /* ══════════════════════════════════════
    INIT
