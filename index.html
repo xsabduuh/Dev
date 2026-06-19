@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Code Editor – Smart Paste & Project Save</title>
+<title>Code Editor – Final</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 :root{
@@ -465,12 +465,10 @@ function showToast(msg){
    RENDER
 ══════════════════════════════════════ */
 function renderLineNums(text){
-  if (!text || text === '') {
-    lineNums.innerHTML = '';
-    return;
-  }
-  var n=(text.match(/\n/g)||[]).length+1,h='';
-  for(var i=1;i<=n;i++)h+='<div class="ln">'+i+'</div>';
+  // Always show at least line number 1
+  var n = (text.match(/\n/g)||[]).length + 1;
+  var h='';
+  for(var i=1;i<=n;i++) h+='<div class="ln">'+i+'</div>';
   lineNums.innerHTML=h;
 }
 function renderHL(text){hlLayer.innerHTML=highlight(text)+'\n';}
@@ -512,11 +510,16 @@ function renderTabs(){
         btn.appendChild(x);
       }
 
-      btn.addEventListener('click',function(e){
-        if(editingTabId !== null) return;
+      // Double-click to rename
+      btn.addEventListener('dblclick', function(e){
         if(f.id === activeId){
           startEditTabName(f.id);
-        } else {
+        }
+      });
+
+      btn.addEventListener('click',function(e){
+        if(editingTabId !== null) return;
+        if(f.id !== activeId){
           switchTab(f.id);
         }
       });
@@ -812,7 +815,6 @@ function renderSavesList() {
         if(arr2[i].id === id) {
           var item = arr2[i];
           if(item.type === 'project' && item.files) {
-            // تحميل مشروع
             commitUndo();
             files = item.files.map(function(f) {
               return { id: f.id, name: f.name, content: f.content };
@@ -828,7 +830,6 @@ function renderSavesList() {
             renderTabs();
             renderEditor();
           } else {
-            // تحميل ملف واحد
             commitUndo();
             getFile().name = item.name;
             applyContent(item.content);
@@ -843,14 +844,16 @@ function renderSavesList() {
     });
   });
 
-  // حذف
+  // حذف مع تأكيد
   savesList.querySelectorAll('[data-del]').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      var id = this.getAttribute('data-del');
-      var arr2 = getSaves().filter(function(s){ return s.id !== id; });
-      setSaves(arr2);
-      renderSavesList();
-      showToast('Deleted');
+      if (confirm('Are you sure you want to delete this saved item?')) {
+        var id = this.getAttribute('data-del');
+        var arr2 = getSaves().filter(function(s){ return s.id !== id; });
+        setSaves(arr2);
+        renderSavesList();
+        showToast('Deleted');
+      }
     });
   });
 }
@@ -949,7 +952,7 @@ document.addEventListener('keydown',function(e){
 });
 
 /* ══════════════════════════════════════
-   RENDER EDITOR (محسن)
+   RENDER EDITOR
 ══════════════════════════════════════ */
 function renderEditor(){
   var f = getFile();
