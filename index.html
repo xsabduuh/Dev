@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Code Editor – Final with Fixed Menu</title>
+<title>Code Editor – Scrollable Tabs & Fixed Close</title>
 <style>
 /* ══════════════════════════════════════
    ALL STYLES – COMPLETE
@@ -34,7 +34,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 .play-btn svg{margin-left:2px;display:block;}
 
 /* Tabs */
-.tabs-bar{display:flex;align-items:stretch;height:var(--th);background:var(--bg-s);border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:hidden;flex-shrink:0;scrollbar-width:none;}
+.tabs-bar{display:flex;align-items:stretch;height:var(--th);background:var(--bg-s);border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:hidden;flex-shrink:0;scrollbar-width:none;touch-action:pan-x; /* يسمح بالتمرير الأفقي */ }
 .tabs-bar::-webkit-scrollbar{display:none;}
 .tab{display:inline-flex;align-items:center;gap:7px;padding:0 14px;height:100%;background:transparent;border:none;border-right:1px solid var(--border);color:var(--fg2);font-family:var(--mono);font-size:12px;white-space:nowrap;flex-shrink:0;cursor:pointer;transition:color .12s,background .12s;position:relative;}
 .tab:hover{color:var(--fg);background:var(--bg-hover);}
@@ -178,7 +178,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 
   <footer class="toolbar">
     <div class="tb-inner">
-      <!-- ترتيب معكوس: Undo | Select All | Redo | Menu -->
+      <!-- ترتيب الأزرار: Undo | Select All | Redo | Menu -->
       <div style="display:flex; align-items:center; gap:10px;">
         <button class="ic-btn" id="undoBtn" title="Undo" disabled>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -295,9 +295,9 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 <div class="toast" id="toast"></div>
 
 <script>
-/* ══════════════════════════════════════
-   MIGRATION & HIGHLIGHTER (كما هي)
-══════════════════════════════════════ */
+/* =========================================================
+   ⚠️ تنبيه هام للمطورين والذكاء الاصطناعي ⚠️
+   ========================================================= */
 (function(){
 'use strict';
 
@@ -441,48 +441,76 @@ function renderTabs(){
         btn.appendChild(x);
       }
 
-      // Long press detection
+      // Long press detection with flag (no preventDefault on touchstart)
       var pressStartTime = 0;
-      var isPressing = false;
+      var longPressed = false;
 
-      function onPressStart(e) {
+      function onTouchStart(e) {
         if (editingTabId !== null) return;
         pressStartTime = Date.now();
-        isPressing = true;
+        longPressed = false;
       }
 
-      function onPressEnd(e) {
-        if (!isPressing) return;
-        isPressing = false;
+      function onTouchEnd(e) {
+        if (!pressStartTime) return;
         var elapsed = Date.now() - pressStartTime;
         if (elapsed >= 500) {
+          longPressed = true;
+          if (f.id === activeId) {
+            startEditTabName(f.id);
+          }
+          // prevent click
+          e.preventDefault();
+        } else {
+          longPressed = false;
+        }
+        pressStartTime = 0;
+      }
+
+      function onTouchCancel(e) {
+        pressStartTime = 0;
+        longPressed = false;
+      }
+
+      // For mouse
+      btn.addEventListener('mousedown', function(e) {
+        if (editingTabId !== null) return;
+        pressStartTime = Date.now();
+        longPressed = false;
+      });
+      btn.addEventListener('mouseup', function(e) {
+        if (!pressStartTime) return;
+        var elapsed = Date.now() - pressStartTime;
+        if (elapsed >= 500) {
+          longPressed = true;
           if (f.id === activeId) {
             startEditTabName(f.id);
           }
         } else {
-          if (f.id !== activeId) {
-            switchTab(f.id);
-          }
+          longPressed = false;
         }
-      }
+        pressStartTime = 0;
+      });
+      btn.addEventListener('mouseleave', function() { pressStartTime = 0; });
 
-      function onPressCancel(e) {
-        isPressing = false;
-      }
+      // Touch events
+      btn.addEventListener('touchstart', onTouchStart, {passive: true});
+      btn.addEventListener('touchend', onTouchEnd, {passive: false});
+      btn.addEventListener('touchcancel', onTouchCancel, {passive: true});
 
-      btn.addEventListener('mousedown', onPressStart);
-      btn.addEventListener('mouseup', onPressEnd);
-      btn.addEventListener('mouseleave', onPressCancel);
-
-      btn.addEventListener('touchstart', function(e) {
-        e.preventDefault();
-        onPressStart(e);
-      }, {passive: false});
-      btn.addEventListener('touchend', function(e) {
-        e.preventDefault();
-        onPressEnd(e);
-      }, {passive: false});
-      btn.addEventListener('touchcancel', onPressCancel);
+      // Click handler: switch tab if not long press and not on close button
+      btn.addEventListener('click', function(e) {
+        if (editingTabId !== null) return;
+        if (longPressed) {
+          // ignore
+          longPressed = false;
+          return;
+        }
+        if (e.target.closest('.tab-x')) return; // ignore close button clicks
+        if (f.id !== activeId) {
+          switchTab(f.id);
+        }
+      });
 
       tabsBar.appendChild(btn);
     })(files[i]);
@@ -656,7 +684,7 @@ function fbCopy(t){var ta=document.createElement('textarea');ta.value=t;ta.style
 tipDismiss.addEventListener('click',function(){copyTip.classList.remove('show');});
 document.addEventListener('mousedown',function(e){if(!copyTip.contains(e.target)&&e.target!==selAllBtn)copyTip.classList.remove('show');});
 
-/* ═══════════ DROPDOWN (الإصلاح الكامل) ═══════════ */
+/* ═══════════ DROPDOWN ═══════════ */
 function closeDropdown(){
   dropdown.classList.remove('show');
   renameRow.classList.remove('show');
@@ -672,19 +700,15 @@ menuBtn.addEventListener('click', function(e) {
   }
 });
 
-// إغلاق القائمة عند الضغط خارجها (يدعم اللمس والفأرة)
 function handleOutsideClick(e) {
   if (!dropdown.classList.contains('show')) return;
-  // إذا كان الهدف هو زر القائمة نفسه، لا نفعل شيئاً (سيتم التبديل في حدث الزر)
   if (e.target === menuBtn || menuBtn.contains(e.target)) return;
-  // إذا كان الهدف داخل القائمة المنسدلة، لا نغلق
   if (dropdown.contains(e.target)) return;
   closeDropdown();
 }
 
 document.addEventListener('click', handleOutsideClick);
 document.addEventListener('touchend', function(e) {
-  // تأخير بسيط للسماح بمعالجة الزر أولاً
   setTimeout(function() { handleOutsideClick(e); }, 10);
 });
 
