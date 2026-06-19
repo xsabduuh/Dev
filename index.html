@@ -2,7 +2,7 @@
 <html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Code Editor</title>
 <style>
 /* ─── Reset & Base ─── */
@@ -20,27 +20,26 @@
   --fg-dim:    #888888;
   --fg-muted:  #444444;
   --accent:    #c792ea;
-  --accent-dk: #a066c9;
   --green:     #c3e88d;
   --blue:      #82aaff;
   --orange:    #f78c6c;
   --yellow:    #ffcb6b;
   --red:       #ff5370;
-  --teal:      #89ddff;
   --header-h:  50px;
   --tabs-h:    34px;
-  --toolbar-h: 68px;
+  --toolbar-h: 72px;
 }
 
-html, body { height: 100%; width: 100%; overflow: hidden; background: #000; }
+html, body { height: 100%; width: 100%; overflow: hidden; background: var(--bg); }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: var(--fg);
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%; /* منع التكبير التلقائي */
 }
 
-button { cursor: pointer; }
+button { cursor: pointer; background: none; border: none; color: inherit; }
 
 /* ─── Shell ─── */
 .shell {
@@ -63,603 +62,236 @@ button { cursor: pointer; }
   padding: 0 16px;
   flex-shrink: 0;
 }
-
 .header-gap { width: 40px; }
-
-.header-title {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--fg);
-}
+.header-title { font-size: 14px; font-weight: 600; letter-spacing: 0.06em; }
 
 .play-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%; background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
   transition: background .15s, transform .1s;
 }
-.play-btn:hover  { background: #d9a8ff; transform: scale(1.06); }
+.play-btn:hover { background: #d9a8ff; transform: scale(1.06); }
 .play-btn:active { transform: scale(0.94); }
 .play-btn svg { margin-left: 2px; }
 
-/* ─── Tabs ─── */
+/* ─── Tabs (شريط الملفات) ─── */
 .tabs-bar {
-  display: flex;
-  align-items: center;
-  height: var(--tabs-h);
-  background: var(--bg-s);
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  flex-shrink: 0;
-  scrollbar-width: none;
+  display: flex; align-items: center; height: var(--tabs-h);
+  background: var(--bg-s); border-bottom: 1px solid var(--border);
+  overflow-x: auto; flex-shrink: 0; scrollbar-width: none;
 }
 .tabs-bar::-webkit-scrollbar { display: none; }
 
 .tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 14px;
-  height: 100%;
-  background: transparent;
-  border: none;
-  border-right: 1px solid var(--border);
-  color: var(--fg-dim);
-  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
-  font-size: 12px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: color .12s, background .12s;
+  display: flex; align-items: center; gap: 6px; padding: 0 14px; height: 100%;
+  background: transparent; border-right: 1px solid var(--border);
+  color: var(--fg-dim); font-family: monospace; font-size: 12px; white-space: nowrap;
+  flex-shrink: 0; transition: color .12s, background .12s;
 }
 .tab:hover { color: var(--fg); background: var(--bg-hover); }
-.tab.active {
-  color: var(--fg);
-  background: var(--bg);
-  border-bottom: 2px solid var(--accent);
-}
+.tab.active { color: var(--fg); background: var(--bg); border-bottom: 2px solid var(--accent); }
+
 .tab-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  color: var(--fg-muted);
+  width: 14px; height: 14px; border-radius: 3px; color: var(--fg-muted);
+  display: flex; align-items: center; justify-content: center;
   transition: color .12s, background .12s;
-  background: transparent;
-  border: none;
-  padding: 0;
 }
 .tab-close:hover { color: var(--red); background: rgba(255,83,112,.12); }
 
 /* ─── Editor Area ─── */
-.editor-wrap {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-  min-height: 0;
-  background: var(--bg);
-}
-
+.editor-wrap { flex: 1; display: flex; overflow: hidden; min-height: 0; background: var(--bg); }
 .line-nums {
-  width: 50px;
-  flex-shrink: 0;
-  background: var(--bg-s);
-  border-right: 1px solid var(--border);
-  padding: 16px 0;
-  overflow: hidden;
-  user-select: none;
-  text-align: right;
+  width: 45px; flex-shrink: 0; background: var(--bg-s);
+  border-right: 1px solid var(--border); padding: 16px 0; overflow: hidden;
+  user-select: none; text-align: right;
 }
-.ln {
-  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
-  font-size: 13px;
-  line-height: 1.625;
-  color: var(--fg-muted);
-  padding-right: 10px;
-  min-height: 21.125px;
-}
+.ln { font-family: monospace; font-size: 13px; line-height: 1.625; color: var(--fg-muted); padding-right: 8px; min-height: 21.125px; }
 
-.editor-inner {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
+.editor-inner { flex: 1; position: relative; overflow: hidden; }
+.hl-layer, .code-area {
+  position: absolute; inset: 0; padding: 16px;
+  font-family: monospace; font-size: 13px; line-height: 1.625;
+  white-space: pre; overflow: auto; tab-size: 2;
 }
-
-.hl-layer,
+.hl-layer { color: var(--fg); pointer-events: none; z-index: 1; overflow: hidden; }
 .code-area {
-  position: absolute;
-  inset: 0;
-  padding: 16px;
-  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
-  font-size: 13px;
-  line-height: 1.625;
-  white-space: pre;
-  overflow: auto;
-  tab-size: 2;
-  word-spacing: normal;
-  letter-spacing: normal;
-}
-
-.hl-layer {
-  color: var(--fg);
-  pointer-events: none;
-  z-index: 1;
-  overflow: hidden;
-}
-
-.code-area {
-  z-index: 2;
-  background: transparent;
-  color: transparent;
-  caret-color: var(--accent);
-  border: none;
-  outline: none;
-  resize: none;
-  width: 100%;
-  height: 100%;
+  z-index: 2; background: transparent; color: transparent; caret-color: var(--accent);
+  border: none; outline: none; resize: none; width: 100%; height: 100%;
   -webkit-text-fill-color: transparent;
+  /* إصلاح مهم: منع الزوم التلقائي في الهواتف */
+  font-size: 16px; 
 }
 .code-area::selection { background: rgba(199,146,234,.22); }
 
 /* ─── Syntax colors ─── */
-.kw  { color: var(--accent);  font-style: italic; }
+.kw  { color: var(--accent); font-style: italic; }
 .str { color: var(--green);   }
 .cmt { color: var(--fg-muted); font-style: italic; }
 .num { color: var(--orange);  }
 .fn  { color: var(--blue);    }
 .cls { color: var(--yellow);  }
 
-/* ─── Toolbar ─── */
+/* ─── Toolbar (الشريط السفلي للأزرار) ─── */
 .toolbar {
-  height: var(--toolbar-h);
-  background: var(--bg-s);
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: var(--toolbar-h); background: var(--bg-s);
+  border-top: 1px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
 }
+.tb-inner { position: relative; display: flex; align-items: center; width: 100%; max-width: 560px; padding: 0 16px; }
 
-.tb-inner {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 560px;
-  padding: 0 16px;
-}
+.tb-group { display: flex; align-items: center; gap: 6px; z-index: 1; }
+.tb-center { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; }
 
-.tb-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  z-index: 1;
-}
-
-.tb-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
+/* الأزرار الدائرية الجانبية */
 .ic-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  color: var(--fg-dim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background .12s, color .12s, transform .1s;
-  flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: 50%; background: var(--bg-card);
+  border: 1px solid var(--border); color: var(--fg-dim);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s, transform .1s; flex-shrink: 0;
 }
 .ic-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--fg); border-color: var(--border-hi); }
 .ic-btn:active:not(:disabled) { transform: scale(0.92); }
 .ic-btn:disabled { opacity: .28; cursor: not-allowed; }
 
+/* زر Editor في المنتصف */
 .editor-pill {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 10px 20px;
-  border-radius: 30px;
-  background: var(--accent);
-  border: none;
-  color: #000;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  transition: background .15s, transform .1s;
-  flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 6px 18px; border-radius: 30px; background: var(--accent); border: none;
+  color: #000; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  transition: background .15s, transform .1s; flex-shrink: 0;
 }
 .editor-pill:hover { background: #d9a8ff; transform: translateY(-1px); }
 .editor-pill:active { transform: scale(0.96); }
 
 /* ─── Copy tooltip ─── */
 .sel-wrap { position: relative; }
-
 .copy-tip {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-menu);
-  border: 1px solid var(--border-hi);
-  border-radius: 8px;
-  padding: 5px 10px;
-  display: none;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  box-shadow: 0 6px 24px rgba(0,0,0,.7);
-  z-index: 300;
-  animation: fu .15s ease;
+  position: absolute; bottom: calc(100% + 12px); left: 50%;
+  transform: translateX(-50%); background: var(--bg-menu);
+  border: 1px solid var(--border-hi); border-radius: 8px; padding: 6px 12px;
+  display: none; align-items: center; gap: 8px; white-space: nowrap;
+  box-shadow: 0 6px 24px rgba(0,0,0,.7); z-index: 300; animation: fu .15s ease;
 }
 .copy-tip.show { display: flex; }
-.copy-tip::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: var(--border-hi);
-}
-
-.copy-tip-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  background: none;
-  border: none;
-  color: var(--fg);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 0;
-  transition: color .12s;
-}
+.copy-tip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: var(--border-hi); }
+.copy-tip-btn { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; transition: color .12s; }
 .copy-tip-btn:hover { color: var(--accent); }
-
-.copy-dismiss {
-  display: flex;
-  align-items: center;
-  background: none;
-  border: none;
-  color: var(--fg-muted);
-  padding: 0;
-  transition: color .12s;
-}
+.copy-dismiss { color: var(--fg-muted); padding: 0; transition: color .12s; }
 .copy-dismiss:hover { color: var(--fg-dim); }
 
-/* ─── Dropdown Menu ─── */
+/* ─── Dropdown Menu (القائمة المنسدلة للملفات) ─── */
 .menu-wrap { position: relative; }
-
 .dropdown {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  right: 0;
-  background: var(--bg-menu);
-  border: 1px solid var(--border-hi);
-  border-radius: 10px;
-  overflow: hidden;
-  min-width: 175px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.8);
-  z-index: 400;
-  display: none;
-  animation: fu .15s ease;
+  position: absolute; bottom: calc(100% + 10px); right: 0;
+  background: var(--bg-menu); border: 1px solid var(--border-hi);
+  border-radius: 10px; overflow: hidden; min-width: 180px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.8); z-index: 400; display: none; animation: fu2 .15s ease;
 }
 .dropdown.show { display: block; }
-
-.dd-item {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 9px 14px;
-  background: none;
-  border: none;
-  color: var(--fg-dim);
-  font-size: 13px;
-  text-align: left;
-  transition: background .12s, color .12s;
-}
+.dd-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; font-size: 13px; text-align: left; transition: background .12s, color .12s; }
 .dd-item:hover { background: var(--bg-hover); color: var(--fg); }
 .dd-item.danger:hover { background: rgba(255,83,112,.1); color: var(--red); }
-
 .dd-sep { height: 1px; background: var(--border); margin: 3px 0; }
 
-.rename-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-}
-.rename-input {
-  flex: 1;
-  background: var(--bg-s);
-  border: 1px solid var(--border-hi);
-  border-radius: 6px;
-  color: var(--fg);
-  font-family: monospace;
-  font-size: 12px;
-  padding: 4px 8px;
-  outline: none;
-}
+.rename-row { display: flex; align-items: center; gap: 6px; padding: 7px 10px; }
+.rename-input { flex: 1; background: var(--bg-s); border: 1px solid var(--border-hi); border-radius: 6px; color: var(--fg); font-family: monospace; font-size: 12px; padding: 4px 8px; outline: none; }
 .rename-input:focus { border-color: var(--accent); }
-.rename-ok {
-  width: 26px; height: 26px;
-  border-radius: 6px;
-  background: var(--accent);
-  border: none;
-  color: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background .12s;
-}
+.rename-ok { width: 26px; height: 26px; border-radius: 6px; background: var(--accent); color: #000; display: flex; align-items: center; justify-content: center; transition: background .12s; }
 .rename-ok:hover { background: #d9a8ff; }
 
 /* ─── Preview Modal ─── */
-.preview-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.85);
-  z-index: 1000;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  animation: fi .2s ease;
-}
+.preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 1000; display: none; align-items: center; justify-content: center; animation: fi .2s ease; }
 .preview-overlay.show { display: flex; }
-
-.preview-panel {
-  display: flex;
-  flex-direction: column;
-  width: min(96vw, 900px);
-  height: min(92vh, 700px);
-  background: var(--bg-s);
-  border: 1px solid var(--border-hi);
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 24px 80px rgba(0,0,0,.9);
-  animation: su .2s ease;
-}
-
-.preview-hd {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  height: 46px;
-  background: var(--bg-s);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.preview-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--fg-dim);
-}
-.close-btn {
-  width: 28px; height: 28px;
-  border-radius: 7px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--fg-dim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background .12s, color .12s;
-}
+.preview-panel { display: flex; flex-direction: column; width: min(96vw, 900px); height: min(92vh, 700px); background: var(--bg-s); border: 1px solid var(--border-hi); border-radius: 14px; overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,.9); animation: su .2s ease; }
+.preview-hd { display: flex; align-items: center; justify-content: space-between; padding: 0 16px; height: 46px; background: var(--bg-s); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.preview-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-dim); }
+.close-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border); color: var(--fg-dim); display: flex; align-items: center; justify-content: center; transition: background .12s, color .12s; }
 .close-btn:hover { background: rgba(255,83,112,.12); color: var(--red); border-color: rgba(255,83,112,.3); }
-
-.preview-frame {
-  flex: 1;
-  border: none;
-  width: 100%;
-  min-height: 0;
-  background: #000;
-}
+.preview-frame { flex: 1; border: none; width: 100%; min-height: 0; background: #000; }
 
 /* ─── Animations ─── */
-@keyframes fu {
-  from { opacity:0; transform:translateX(-50%) translateY(4px); }
-  to   { opacity:1; transform:translateX(-50%) translateY(0); }
-}
-@keyframes fu2 {
-  from { opacity:0; transform:translateY(4px); }
-  to   { opacity:1; transform:translateY(0); }
-}
-@keyframes fi {
-  from { opacity:0; } to { opacity:1; }
-}
-@keyframes su {
-  from { opacity:0; transform:translateY(14px); }
-  to   { opacity:1; transform:translateY(0); }
-}
+@keyframes fu { from { opacity:0; transform:translateX(-50%) translateY(4px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+@keyframes fu2 { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fi { from { opacity:0; } to { opacity:1; } }
+@keyframes su { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
 
-/* ─── Scrollbars ─── */
-::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar { width:6px; height:6px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:var(--border-hi); border-radius:3px; }
-::-webkit-scrollbar-thumb:hover { background:#444; }
+::-webkit-scrollbar-thumb:hover { background:#555; }
 
-/* ─── Responsive ─── */
-@media(max-width:480px){
-  .preview-panel{ width:100vw; height:100vh; border-radius:0; border:none; }
-  .tb-inner{ padding:0 10px; }
-  .editor-pill{ padding:8px 14px; }
+@media(max-width:480px){ 
+  .preview-panel{ width:100vw; height:100vh; border-radius:0; } 
+  .tb-inner{ padding:0 8px; } 
+  .ic-btn { width: 30px; height: 30px; }
 }
 </style>
 </head>
 <body>
-
 <div class="shell">
-
-  <!-- ── Header ── -->
   <header class="header">
     <div class="header-gap"></div>
     <span class="header-title">Editor</span>
     <button class="play-btn" id="playBtn" title="Preview">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-        <polygon points="5,3 19,12 5,21"/>
-      </svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
     </button>
   </header>
 
-  <!-- ── Tabs ── -->
+  <!-- شريط التبويبات (تظهر فيه أسماء ملفاتك مثل index.html) -->
   <div class="tabs-bar" id="tabsBar"></div>
 
-  <!-- ── Editor ── -->
   <div class="editor-wrap">
     <div class="line-nums" id="lineNums"></div>
     <div class="editor-inner">
-      <div class="hl-layer" id="hlLayer" aria-hidden="true"></div>
-      <textarea class="code-area" id="codeArea"
-        spellcheck="false" autocomplete="off" autocorrect="off"
-        autocapitalize="off"></textarea>
+      <div class="hl-layer" id="hlLayer"></div>
+      <textarea class="code-area" id="codeArea" spellcheck="false"></textarea>
     </div>
   </div>
 
-  <!-- ── Toolbar ── -->
   <footer class="toolbar">
     <div class="tb-inner">
-
-      <!-- Left -->
+      <!-- الأزرار اليسار -->
       <div class="tb-group">
-        <button class="ic-btn" id="undoBtn" title="Undo" disabled>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
-          </svg>
+        <button class="ic-btn" id="undoBtn" title="Undo (Ctrl+Z)" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
         </button>
-        <button class="ic-btn" id="redoBtn" title="Redo" disabled>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/>
-          </svg>
+        <button class="ic-btn" id="redoBtn" title="Redo (Ctrl+Y)" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+        </button>
+        <button class="ic-btn" id="selAllBtn" title="Select All (Ctrl+A)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         </button>
       </div>
 
-      <!-- Center -->
+      <!-- زر Editor في المنتصف -->
       <div class="tb-center">
         <div class="sel-wrap">
-          <button class="ic-btn" id="selAllBtn" title="Select All">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="7" height="7"/>
-              <rect x="14" y="3" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/>
-            </svg>
-          </button>
           <div class="copy-tip" id="copyTip">
             <button class="copy-tip-btn" id="copyBtn">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-              Copy
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy
             </button>
-            <button class="copy-dismiss" id="copyDismiss">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2.5">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
+            <button class="copy-dismiss" id="copyDismiss"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           </div>
         </div>
 
         <button class="editor-pill" title="Editor">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
-          Editor
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editor
         </button>
       </div>
 
-      <!-- Right -->
+      <!-- الأزرار اليمين (القائمة) -->
       <div class="tb-group">
         <div class="menu-wrap">
-          <button class="ic-btn" id="menuBtn" title="File options">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="5" cy="12" r="1.5"/>
-              <circle cx="12" cy="12" r="1.5"/>
-              <circle cx="19" cy="12" r="1.5"/>
-            </svg>
-          </button>
+          <button class="ic-btn" id="menuBtn" title="File options"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
           <div class="dropdown" id="dropdown">
-            <button class="dd-item" id="saveBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                <polyline points="17 21 17 13 7 13 7 21"/>
-                <polyline points="7 3 7 8 15 8"/>
-              </svg>
-              Save Code
-            </button>
-            <button class="dd-item danger" id="deleteBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                <path d="M10 11v6M14 11v6"/>
-                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-              </svg>
-              Delete Code
-            </button>
+            <button class="dd-item" id="saveBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Code</button>
+            <button class="dd-item danger" id="deleteBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Delete Code</button>
             <div id="renameSection">
-              <button class="dd-item" id="renameBtn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 20h9"/>
-                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                </svg>
-                Rename
-              </button>
-              <div class="rename-row" id="renameRow" style="display:none">
-                <input class="rename-input" id="renameInput" type="text"/>
-                <button class="rename-ok" id="renameOk">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2.5">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                </button>
-              </div>
+              <button class="dd-item" id="renameBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Rename</button>
+              <div class="rename-row" id="renameRow" style="display:none"><input class="rename-input" id="renameInput" type="text"/><button class="rename-ok" id="renameOk"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></button></div>
             </div>
             <div class="dd-sep"></div>
-            <button class="dd-item" id="addFileBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="12" y1="18" x2="12" y2="12"/>
-                <line x1="9" y1="15" x2="15" y2="15"/>
-              </svg>
-              Add New File
-            </button>
+            <button class="dd-item" id="addFileBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> Add File</button>
           </div>
         </div>
       </div>
@@ -667,20 +299,11 @@ button { cursor: pointer; }
   </footer>
 </div>
 
-<!-- ── Preview Modal ── -->
+<!-- نافذة المعاينة -->
 <div class="preview-overlay" id="previewOverlay">
   <div class="preview-panel">
-    <div class="preview-hd">
-      <span class="preview-label">Preview</span>
-      <button class="close-btn" id="closePreview" title="Close (Esc)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2.5">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-    <iframe class="preview-frame" id="previewFrame" title="Code Preview" sandbox="allow-scripts"></iframe>
+    <div class="preview-hd"><span class="preview-label">Preview</span><button class="close-btn" id="closePreview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <iframe class="preview-frame" id="previewFrame" sandbox="allow-scripts"></iframe>
   </div>
 </div>
 
@@ -689,209 +312,158 @@ button { cursor: pointer; }
 'use strict';
 
 /* ═══════════════════════════════════════════
-   HIGHLIGHTER  — single-pass tokenizer
+   Syntax Highlighter
 ═══════════════════════════════════════════ */
-const KEYWORDS = new Set([
-  'const','let','var','function','return','if','else','for','while','do',
-  'switch','case','break','continue','new','delete','typeof','instanceof',
-  'in','of','class','extends','import','export','default','async','await',
-  'try','catch','finally','throw','this','super','null','undefined','true',
-  'false','void','yield','static','get','set','from','debugger','with',
-]);
+const KEYWORDS = new Set(['const','let','var','function','return','if','else','for','while','do','switch','case','break','continue','new','delete','typeof','instanceof','in','of','class','extends','import','export','default','async','await','try','catch','finally','throw','this','super','null','undefined','true','false','void','yield','static','get','set','from','debugger','with']);
 
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function highlight(code){
-  const out = [];
-  let i = 0, len = code.length;
+  const out = []; let i = 0, len = code.length;
   while(i < len){
     const c = code[i];
-
-    /* line comment */
-    if(c==='/' && code[i+1]==='/'){
-      let e = code.indexOf('\n',i); if(e===-1) e=len;
-      out.push('<span class="cmt">'+esc(code.slice(i,e))+'</span>'); i=e; continue;
-    }
-    /* block comment */
-    if(c==='/' && code[i+1]==='*'){
-      let e = code.indexOf('*/',i+2); e = e===-1 ? len : e+2;
-      out.push('<span class="cmt">'+esc(code.slice(i,e))+'</span>'); i=e; continue;
-    }
-    /* strings */
-    if(c==='"'||c==="'"||c==='`'){
-      let j=i+1;
-      while(j<len){ if(code[j]==='\\' && j+1<len){j+=2;continue;} if(code[j]===c){j++;break;} j++; }
-      out.push('<span class="str">'+esc(code.slice(i,j))+'</span>'); i=j; continue;
-    }
-    /* number */
-    if(/\d/.test(c) && (i===0||/\W/.test(code[i-1]))){
-      let j=i;
-      if(code[j]==='0'&&(code[j+1]==='x'||code[j+1]==='X')){j+=2;while(j<len&&/[0-9a-fA-F]/.test(code[j]))j++;}
-      else { while(j<len&&/[\d.]/.test(code[j]))j++; }
-      out.push('<span class="num">'+esc(code.slice(i,j))+'</span>'); i=j; continue;
-    }
-    /* identifier / keyword */
-    if(/[a-zA-Z_$]/.test(c)){
-      let j=i+1; while(j<len&&/[\w$]/.test(code[j]))j++;
-      const word=code.slice(i,j);
-      const isCall=code[j]==='(';
-      const isUpper=/^[A-Z]/.test(word);
-      if(KEYWORDS.has(word))      out.push('<span class="kw">'+esc(word)+'</span>');
-      else if(isCall)             out.push('<span class="fn">'+esc(word)+'</span>');
-      else if(isUpper)            out.push('<span class="cls">'+esc(word)+'</span>');
-      else                        out.push(esc(word));
-      i=j; continue;
-    }
+    if(c==='/' && code[i+1]==='/'){ let e = code.indexOf('\n',i); if(e===-1) e=len; out.push('<span class="cmt">'+esc(code.slice(i,e))+'</span>'); i=e; continue; }
+    if(c==='/' && code[i+1]==='*'){ let e = code.indexOf('*/',i+2); e = e===-1 ? len : e+2; out.push('<span class="cmt">'+esc(code.slice(i,e))+'</span>'); i=e; continue; }
+    if(c==='"'||c==="'"||c==='`'){ let j=i+1; while(j<len){ if(code[j]==='\\' && j+1<len){j+=2;continue;} if(code[j]===c){j++;break;} j++; } out.push('<span class="str">'+esc(code.slice(i,j))+'</span>'); i=j; continue; }
+    if(/\d/.test(c) && (i===0||/\W/.test(code[i-1]))){ let j=i; if(code[j]==='0'&&(code[j+1]==='x'||code[j+1]==='X')){j+=2;while(j<len&&/[0-9a-fA-F]/.test(code[j]))j++;} else { while(j<len&&/[\d.]/.test(code[j]))j++; } out.push('<span class="num">'+esc(code.slice(i,j))+'</span>'); i=j; continue; }
+    if(/[a-zA-Z_$]/.test(c)){ let j=i+1; while(j<len&&/[\w$]/.test(code[j]))j++; const word=code.slice(i,j); const isCall=code[j]==='('; const isUpper=/^[A-Z]/.test(word); if(KEYWORDS.has(word)) out.push('<span class="kw">'+esc(word)+'</span>'); else if(isCall) out.push('<span class="fn">'+esc(word)+'</span>'); else if(isUpper) out.push('<span class="cls">'+esc(word)+'</span>'); else out.push(esc(word)); i=j; continue; }
     out.push(esc(c)); i++;
   }
   return out.join('');
 }
 
 /* ═══════════════════════════════════════════
-   STATE
+   STATE & LOGIC
 ═══════════════════════════════════════════ */
-let files = [{ id:1, name:'main.js', content:'// Welcome to the Code Editor\n// Start writing your JavaScript code here\n\nfunction greet(name) {\n  const message = "Hello, " + name + "!";\n  console.log(message);\n  return message;\n}\n\nconst result = greet("World");\nconsole.log(result);\n\n// Try the Preview button above to see your code!\n' }];
-let activeId = 1;
-let nextId   = 2;
-
-const undoStacks = { 1:[] };
-const redoStacks = { 1:[] };
-
+let files = [{ id:1, name:'index.html', content:'<!DOCTYPE html>\n<html>\n<head>\n  <title>My Project</title>\n</head>\n<body>\n  <h1>Hello World</h1>\n  <script>\n    console.log("Hello from JavaScript!");\n  <\/script>\n</body>\n</html>' }];
+let activeId = 1; let nextId = 2;
+const undoStacks = { 1:[] }; const redoStacks = { 1:[] };
 function active(){ return files.find(f=>f.id===activeId); }
 
-/* ═══════════════════════════════════════════
-   DOM REFS
-═══════════════════════════════════════════ */
-const tabsBar       = document.getElementById('tabsBar');
-const lineNums      = document.getElementById('lineNums');
-const hlLayer       = document.getElementById('hlLayer');
-const codeArea      = document.getElementById('codeArea');
-const undoBtn       = document.getElementById('undoBtn');
-const redoBtn       = document.getElementById('redoBtn');
-const selAllBtn     = document.getElementById('selAllBtn');
-const copyTip       = document.getElementById('copyTip');
-const copyBtn       = document.getElementById('copyBtn');
-const copyDismiss   = document.getElementById('copyDismiss');
-const menuBtn       = document.getElementById('menuBtn');
-const dropdown      = document.getElementById('dropdown');
-const saveBtn       = document.getElementById('saveBtn');
-const deleteBtn     = document.getElementById('deleteBtn');
-const renameBtn     = document.getElementById('renameBtn');
-const renameRow     = document.getElementById('renameRow');
-const renameInput   = document.getElementById('renameInput');
-const renameOk      = document.getElementById('renameOk');
-const addFileBtn    = document.getElementById('addFileBtn');
-const playBtn       = document.getElementById('playBtn');
-const previewOverlay= document.getElementById('previewOverlay');
-const previewFrame  = document.getElementById('previewFrame');
-const closePreview  = document.getElementById('closePreview');
+const tabsBar = document.getElementById('tabsBar');
+const lineNums = document.getElementById('lineNums');
+const hlLayer = document.getElementById('hlLayer');
+const codeArea = document.getElementById('codeArea');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+const selAllBtn = document.getElementById('selAllBtn');
+const copyTip = document.getElementById('copyTip');
+const copyBtn = document.getElementById('copyBtn');
+const copyDismiss = document.getElementById('copyDismiss');
+const menuBtn = document.getElementById('menuBtn');
+const dropdown = document.getElementById('dropdown');
+const saveBtn = document.getElementById('saveBtn');
+const deleteBtn = document.getElementById('deleteBtn');
+const renameBtn = document.getElementById('renameBtn');
+const renameRow = document.getElementById('renameRow');
+const renameInput = document.getElementById('renameInput');
+const renameOk = document.getElementById('renameOk');
+const addFileBtn = document.getElementById('addFileBtn');
+const playBtn = document.getElementById('playBtn');
+const previewOverlay = document.getElementById('previewOverlay');
+const previewFrame = document.getElementById('previewFrame');
+const closePreview = document.getElementById('closePreview');
 
 /* ═══════════════════════════════════════════
-   RENDER
+   RENDER FUNCTIONS
 ═══════════════════════════════════════════ */
 function renderTabs(){
-  tabsBar.innerHTML='';
-  files.forEach(f=>{
-    const btn = document.createElement('button');
-    btn.className='tab'+(f.id===activeId?' active':'');
-    btn.dataset.id=f.id;
-    const nameSpan=document.createElement('span');
-    nameSpan.textContent=f.name;
-    btn.appendChild(nameSpan);
-    if(files.length>1){
-      const x=document.createElement('button');
-      x.className='tab-close';
-      x.title='Close';
-      x.innerHTML='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-      x.addEventListener('click',e=>{ e.stopPropagation(); closeTab(f.id); });
-      btn.appendChild(x);
-    }
-    btn.addEventListener('click',()=>switchTab(f.id));
-    tabsBar.appendChild(btn);
+  tabsBar.innerHTML=''; 
+  files.forEach(f=>{ 
+    const btn=document.createElement('button'); 
+    btn.className='tab'+(f.id===activeId?' active':''); 
+    btn.dataset.id=f.id; 
+    const nameSpan=document.createElement('span'); 
+    nameSpan.textContent=f.name; 
+    btn.appendChild(nameSpan); 
+    if(files.length>1){ 
+      const x=document.createElement('button'); 
+      x.className='tab-close'; 
+      x.innerHTML='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'; 
+      x.addEventListener('click',e=>{ e.stopPropagation(); closeTab(f.id); }); 
+      btn.appendChild(x); 
+    } 
+    btn.addEventListener('click',()=>switchTab(f.id)); 
+    tabsBar.appendChild(btn); 
   });
 }
 
-function renderEditor(){
-  const f=active();
-  if(!f) return;
-  codeArea.value=f.content;
-  hlLayer.innerHTML=highlight(f.content)+'\n';
-  renderLines(f.content);
-  updateUndoRedo();
+function renderEditor(){ 
+  const f=active(); 
+  if(!f) return; 
+  codeArea.value=f.content; 
+  hlLayer.innerHTML=highlight(f.content)+'\n'; 
+  renderLines(f.content); 
+  updateUndoRedo(); 
 }
 
-function renderLines(text){
-  const n=(text.match(/\n/g)||[]).length+1;
-  let html='';
-  for(let i=1;i<=n;i++) html+='<div class="ln">'+i+'</div>';
-  lineNums.innerHTML=html;
+function renderLines(text){ 
+  const n=(text.match(/\n/g)||[]).length+1; 
+  let html=''; 
+  for(let i=1;i<=n;i++) html+='<div class="ln">'+i+'</div>'; 
+  lineNums.innerHTML=html; 
 }
 
-function updateUndoRedo(){
-  const u=undoStacks[activeId]||[];
-  const r=redoStacks[activeId]||[];
-  undoBtn.disabled=u.length===0;
-  redoBtn.disabled=r.length===0;
+function updateUndoRedo(){ 
+  undoBtn.disabled=(undoStacks[activeId]||[]).length===0; 
+  redoBtn.disabled=(redoStacks[activeId]||[]).length===0; 
 }
 
-/* ═══════════════════════════════════════════
-   TAB MANAGEMENT
-═══════════════════════════════════════════ */
-function switchTab(id){
-  activeId=id;
-  renderTabs();
-  renderEditor();
-  dropdown.classList.remove('show');
-  renameRow.style.display='none';
-  copyTip.classList.remove('show');
+function switchTab(id){ 
+  activeId=id; 
+  renderTabs(); 
+  renderEditor(); 
+  dropdown.classList.remove('show'); 
+  renameRow.style.display='none'; 
+  copyTip.classList.remove('show'); 
 }
 
-function closeTab(id){
-  if(files.length===1) return;
-  files=files.filter(f=>f.id!==id);
-  delete undoStacks[id]; delete redoStacks[id];
-  if(activeId===id) activeId=files[files.length-1].id;
-  renderTabs(); renderEditor();
+function closeTab(id){ 
+  if(files.length===1) return; 
+  files=files.filter(f=>f.id!==id); 
+  delete undoStacks[id]; delete redoStacks[id]; 
+  if(activeId===id) activeId=files[files.length-1].id; 
+  renderTabs(); renderEditor(); 
 }
 
 /* ═══════════════════════════════════════════
    UNDO / REDO
 ═══════════════════════════════════════════ */
-function pushUndo(prev){
-  if(!undoStacks[activeId]) undoStacks[activeId]=[];
-  const stack=undoStacks[activeId];
-  if(stack[stack.length-1]===prev) return;
-  stack.push(prev);
-  if(stack.length>80) stack.shift();
-  redoStacks[activeId]=[];
+function pushUndo(prev){ 
+  if(!undoStacks[activeId]) undoStacks[activeId]=[]; 
+  const stack=undoStacks[activeId]; 
+  if(stack[stack.length-1]===prev) return; 
+  stack.push(prev); 
+  if(stack.length>80) stack.shift(); 
+  redoStacks[activeId]=[]; 
 }
 
-function doUndo(){
-  const stack=undoStacks[activeId]||[];
-  if(!stack.length) return;
-  const prev=stack.pop();
-  const cur=active().content;
-  if(!redoStacks[activeId]) redoStacks[activeId]=[];
-  redoStacks[activeId].push(cur);
-  setContent(prev);
+function doUndo(){ 
+  const stack=undoStacks[activeId]||[]; 
+  if(!stack.length) return; 
+  const prev=stack.pop(); 
+  const cur=active().content; 
+  if(!redoStacks[activeId]) redoStacks[activeId]=[]; 
+  redoStacks[activeId].push(cur); 
+  setContent(prev); 
 }
 
-function doRedo(){
-  const stack=redoStacks[activeId]||[];
-  if(!stack.length) return;
-  const next=stack.pop();
-  const cur=active().content;
-  if(!undoStacks[activeId]) undoStacks[activeId]=[];
-  undoStacks[activeId].push(cur);
-  setContent(next);
+function doRedo(){ 
+  const stack=redoStacks[activeId]||[]; 
+  if(!stack.length) return; 
+  const next=stack.pop(); 
+  const cur=active().content; 
+  if(!undoStacks[activeId]) undoStacks[activeId]=[]; 
+  undoStacks[activeId].push(cur); 
+  setContent(next); 
 }
 
-function setContent(val){
-  files=files.map(f=>f.id===activeId?{...f,content:val}:f);
-  codeArea.value=val;
-  hlLayer.innerHTML=highlight(val)+'\n';
-  renderLines(val);
-  updateUndoRedo();
+function setContent(val){ 
+  files=files.map(f=>f.id===activeId?{...f,content:val}:f); 
+  codeArea.value=val; 
+  hlLayer.innerHTML=highlight(val)+'\n'; 
+  renderLines(val); 
+  updateUndoRedo(); 
 }
 
 /* ═══════════════════════════════════════════
@@ -939,25 +511,25 @@ codeArea.addEventListener('keydown',e=>{
 undoBtn.addEventListener('click',doUndo);
 redoBtn.addEventListener('click',doRedo);
 
+/* زر تحديد الكل + نسخ */
 selAllBtn.addEventListener('click',()=>{
   codeArea.select();
   copyTip.classList.add('show');
 });
+
 copyBtn.addEventListener('click',async()=>{
   try{ await navigator.clipboard.writeText(codeArea.value); }catch(e){}
   copyTip.classList.remove('show');
 });
 copyDismiss.addEventListener('click',()=> copyTip.classList.remove('show'));
 
-/* Close copy tip on outside click */
+/* أغلق أداة النسخ عند الضغط خارجها */
 document.addEventListener('mousedown',e=>{
   if(!copyTip.contains(e.target)&&e.target!==selAllBtn)
     copyTip.classList.remove('show');
 });
 
-/* ═══════════════════════════════════════════
-   DROPDOWN MENU
-═══════════════════════════════════════════ */
+/* ─── القائمة المنسدلة ─── */
 menuBtn.addEventListener('click',e=>{
   e.stopPropagation();
   const open=dropdown.classList.toggle('show');
@@ -970,6 +542,7 @@ document.addEventListener('mousedown',e=>{
   }
 });
 
+/* حفظ الملف */
 saveBtn.addEventListener('click',()=>{
   const f=active();
   const blob=new Blob([f.content],{type:'text/plain'});
@@ -980,6 +553,7 @@ saveBtn.addEventListener('click',()=>{
   dropdown.classList.remove('show');
 });
 
+/* حذف المحتوى */
 deleteBtn.addEventListener('click',()=>{
   pushUndo(active().content);
   setContent('');
@@ -987,6 +561,7 @@ deleteBtn.addEventListener('click',()=>{
   dropdown.classList.remove('show');
 });
 
+/* إعادة التسمية */
 renameBtn.addEventListener('click',e=>{
   e.stopPropagation();
   renameInput.value=active().name;
@@ -1008,19 +583,20 @@ renameInput.addEventListener('keydown',e=>{
   if(e.key==='Escape'){ renameRow.style.display='none'; renameBtn.style.display='flex'; }
 });
 
+/* إضافة ملف جديد */
 addFileBtn.addEventListener('click',()=>{
   const id=nextId++;
-  const name='file'+id+'.js';
-  files.push({id,name,content:'// New file\n'});
+  const name='file_'+id+'.js';
+  files.push({id,name,content:'// New file created\n'});
   undoStacks[id]=[]; redoStacks[id]=[];
   activeId=id;
   renderTabs(); renderEditor();
-  lastVal='// New file\n';
+  lastVal='// New file created\n';
   dropdown.classList.remove('show');
 });
 
 /* ═══════════════════════════════════════════
-   PREVIEW
+   PREVIEW (زر المعاينة العلوي)
 ═══════════════════════════════════════════ */
 function openPreview(){
   const code=active().content;
@@ -1030,9 +606,9 @@ function openPreview(){
 <meta charset="utf-8">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:#000;color:#e8e8e8;font-family:'Cascadia Code','Fira Code',monospace;font-size:13px;line-height:1.65;padding:24px;min-height:100vh;}
+body{background:#000;color:#e8e8e8;font-family:monospace;font-size:14px;line-height:1.6;padding:24px;min-height:100vh;}
 .hdr{color:#444;font-size:10px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:16px;border-bottom:1px solid #1a1a1a;padding-bottom:8px;}
-.ln{margin:1px 0;}
+.ln{margin:2px 0;}
 .log{color:#e8e8e8;}.err{color:#ff5370;}.warn{color:#ffcb6b;}.info{color:#89ddff;}
 </style>
 </head>
