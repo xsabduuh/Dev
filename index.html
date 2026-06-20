@@ -86,8 +86,8 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 .fn{color:var(--blue);}
 .cls{color:var(--yel);}
 
-/* Toolbar */
-.toolbar{height:var(--tbh);background:var(--bg-s);border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;z-index:10;padding-bottom:10px;}
+/* Toolbar — safe area for iOS home indicator */
+.toolbar{height:var(--tbh);background:var(--bg-s);border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;z-index:10;padding-bottom:max(10px,env(safe-area-inset-bottom));}
 .tb-inner{display:flex;align-items:center;justify-content:center;width:100%;max-width:520px;padding:0 16px;}
 .ic-btn{width:38px;height:38px;border-radius:50%;background:var(--bg-card);border:1px solid var(--bhi);color:var(--fg2);display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s,transform .1s,border-color .12s;flex-shrink:0;}
 .ic-btn:hover:not(:disabled){background:var(--bg-hover);color:var(--fg);border-color:#444;}
@@ -375,30 +375,9 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 
     var dataURL = canvas.toDataURL('image/png');
 
-    /* Set apple-touch-icon as real PNG */
+    /* Set apple-touch-icon as real PNG — iOS requires PNG, not SVG */
     var touchIcon = document.getElementById('appleTouchIcon');
     if (touchIcon) touchIcon.href = dataURL;
-
-    /* Inject Web App Manifest dynamically */
-    var manifest = {
-      name: 'Code Editor',
-      short_name: 'Editor',
-      description: 'A mobile code editor',
-      display: 'standalone',
-      orientation: 'portrait',
-      start_url: '.',
-      background_color: '#000000',
-      theme_color: '#c792ea',
-      icons: [
-        { src: dataURL, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
-      ]
-    };
-    var blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-    var manifestURL = URL.createObjectURL(blob);
-    var manifestLink = document.createElement('link');
-    manifestLink.rel = 'manifest';
-    manifestLink.href = manifestURL;
-    document.head.appendChild(manifestLink);
 
   } catch(e) { /* canvas unsupported — fallback to SVG icon already in head */ }
 })();
