@@ -495,277 +495,288 @@ function buildMultiFilePreview(){
   return result;
 }
 
-/* ═══════════ NEW SMART PIPELINE ═══════════ */
+/* ═══════════════════════════════════════════════════
+   SMART PIPELINE — 3 phases, each runs exactly once.
+   Phases 1 & 2 are silent (never shown to user).
+   Phase 3 detects remaining issues and shows them.
+   Fix buttons (individual or Fix-All) only re-run
+   Phase 3 — they never re-trigger Phases 1 or 2.
+═══════════════════════════════════════════════════ */
+
 var detectedIssues = [];
 var previewContentCache = '';
 
-// ---- Phase 1: Smart Assembly ----
+/* ── Phase 1: Assemble Full Page ─────────────────── */
 function assembleFullPage(raw) {
-  // 1. Strip Markdown fences
-  var code = raw.replace(/```[\w-]*\s*\n?/g, '').replace(/```/g, '');
-  
-  // Check if it's pure CSS or pure JS
+  // Strip Markdown code fences
+  var code = raw.replace(/```[\w-]*[ \t]*\r?\n?/g, '').replace(/```/g, '');
+
+  // Detect pure CSS or pure JS (no HTML tags at all)
   var hasTags = /<[a-zA-Z][^>]*>/.test(code);
-  var isCSS = !hasTags && /[{;]\s*\n?\s*[a-zA-Z-]+\s*:/.test(code);
-  var isJS = !hasTags && /\b(function|const|let|var|=>|console\.log|alert|document\.)\b/.test(code);
-  
+  var isCSS = !hasTags && /\{[^}]*:[^}]*\}/.test(code);
+  var isJS  = !hasTags && /\b(function|const|let|var|=>|console\.log|alert|document\.)\b/.test(code);
+
   if (isCSS) {
-    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n<style>\n' + code + '\n</style>\n</head>\n<body>\n</body>\n</html>';
+    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n' +
+           '<meta charset="UTF-8">\n' +
+           '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+           '<title>Preview</title>\n' +
+           '<style>\n' + code + '\n</style>\n' +
+           '</head>\n<body>\n</body>\n</html>';
   }
   if (isJS) {
-    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n</head>\n<body>\n<script>\n' + code + '\n<\/script>\n</body>\n</html>';
+    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n' +
+           '<meta charset="UTF-8">\n' +
+           '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+           '<title>Preview</title>\n' +
+           '</head>\n<body>\n' +
+           '<script>\n' + code + '\n<\/script>\n' +
+           '</body>\n</html>';
   }
-  
-  // It's HTML (maybe partial)
-  var doctypePresent = /<!DOCTYPE\s+html/i.test(code);
-  var htmlTagPresent = /<html[\s>]/i.test(code);
-  var headPresent = /<head[\s>]/i.test(code);
-  var bodyPresent = /<body[\s>]/i.test(code);
-  
+
+  // HTML (possibly partial) — add missing structural elements
   var result = code;
-  
-  // If no DOCTYPE and no html tag, wrap everything
-  if (!htmlTagPresent) {
-    result = '<!DOCTYPE html>\n<html lang="en">\n' + result + '\n</html>';
-  } else if (!doctypePresent) {
-    result = '<!DOCTYPE html>\n' + result;
-  }
-  
-  // Now ensure <head> and <body> exist
-  if (!/<head[\s>]/i.test(result) && !/<body[\s>]/i.test(result)) {
-    // No head and no body: add them
-    result = result.replace(/(<html[^>]*>)/i, '$1\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n</head>\n<body>')
-                   .replace(/<\/html>/i, '</body>\n</html>');
+  var hasHtmlTag   = /<html[\s>]/i.test(result);
+  var hasDoctype   = /<!DOCTYPE\s+html/i.test(result);
+
+  if (!hasHtmlTag) {
+    // Fully wrap bare snippet
+    result =
+      '<!DOCTYPE html>\n<html lang="en">\n<head>\n' +
+      '<meta charset="UTF-8">\n' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+      '<title>Preview</title>\n</head>\n<body>\n' +
+      result +
+      '\n</body>\n</html>';
   } else {
-    // Head exists but maybe missing essentials
+    if (!hasDoctype) result = '<!DOCTYPE html>\n' + result;
     if (/<head[\s>]/i.test(result)) {
-      if (!/<meta[^>]*charset/i.test(result)) {
+      if (!/<meta[^>]*charset/i.test(result))
         result = result.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">');
-      }
-      if (!/<meta[^>]*name\s*=\s*["']viewport["'][^>]*>/i.test(result)) {
+      if (!/<meta[^>]*name\s*=\s*["']viewport["']/i.test(result))
         result = result.replace(/(<head[^>]*>)/i, '$1\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
-      }
-      if (!/<title[^>]*>/i.test(result)) {
+      if (!/<title[\s>]/i.test(result))
         result = result.replace(/<\/head>/i, '<title>Preview</title>\n</head>');
-      }
     }
     if (!/<body[\s>]/i.test(result)) {
       result = result.replace(/<\/head>/i, '</head>\n<body>')
                      .replace(/<\/html>/i, '</body>\n</html>');
     }
   }
-  
+
   return result;
 }
 
-// ---- Phase 2: Silent Fixes ----
+/* ── Phase 2: Silent Fixes (applied once, never displayed) ── */
 function applySilentFixes(html) {
   var fixed = html;
-  
-  // Self-closing block tags -> proper pairs
-  fixed = fixed.replace(/<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*)?\/\s*>/gi, function(m, tag, attrs) {
-    return '<' + tag + (attrs || '') + '></' + tag + '>';
-  });
-  
-  // Unitless numeric CSS values -> add px (except 0)
-  fixed = fixed.replace(/:\s*(\d+)(?![a-zA-Z%])\s*;/g, function(match, num) {
+
+  // Self-closing block tags → proper open/close pairs
+  fixed = fixed.replace(
+    /<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*)?\/\s*>/gi,
+    function(m, tag, attrs) { return '<' + tag + (attrs || '') + '></' + tag + '>'; }
+  );
+
+  // Unitless numeric CSS values → add px (except 0 and numbers inside quotes/strings)
+  fixed = fixed.replace(/:\s*(\d+)(?![a-zA-Z%.\d])\s*;/g, function(match, num) {
     return num === '0' ? match : ': ' + num + 'px;';
   });
-  
-  // Comment out document.write
-  fixed = fixed.replace(/^([ \t]*)document\.write/gm, '$1// document.write');
-  
-  // Fix missing ) before { in if/while/for
-  fixed = fixed.replace(/(if|while|for)\s*\(([^{}]*?)\s*\{/g, function(m, keyword, cond) {
-    return keyword + '(' + cond + ') {';
+
+  // Comment out document.write calls
+  fixed = fixed.replace(/^([ \t]*)document\.write\b/gm, '$1// document.write');
+
+  // Fix genuinely missing closing ) before { in if/while/for.
+  // The pattern only matches when there is NO closing ) between ( and {,
+  // so valid code like `if (x > 5) {` is left completely untouched.
+  fixed = fixed.replace(/(if|while|for)\s*\(([^(){}]+)\s*\{/g, function(m, kw, cond) {
+    return kw + '(' + cond.replace(/\s+$/, '') + ') {';
   });
-  
-  // Add console div if console.log used and no console element
+
+  // Add console panel exactly once if console.log is used and no #console exists
   if (/console\.log\(/.test(fixed) && !/id\s*=\s*["']console["']/.test(fixed)) {
-    var consoleDiv = '<div id="console" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#111;color:#0f0;font-family:monospace;overflow:auto;padding:8px;border-top:1px solid #333;z-index:9999;"></div>';
-    var consoleScript = '<script>(function(){var c=document.getElementById("console");if(!c)return;var oldLog=console.log;console.log=function(){var args=Array.prototype.slice.call(arguments);c.innerHTML+=args.join(" ")+"\\n";oldLog.apply(console,args);};window.onerror=function(m,s,l,cl,er){c.innerHTML+="ERROR: "+m+"\\n";};})();<\/script>';
+    var consoleDiv =
+      '<div id="console" style="position:fixed;bottom:0;left:0;right:0;height:120px;' +
+      'background:#111;color:#0f0;font-family:monospace;overflow:auto;padding:8px;' +
+      'border-top:1px solid #333;z-index:9999;"></div>';
+    var consoleScript =
+      '<script>(function(){' +
+      'var c=document.getElementById("console");if(!c)return;' +
+      'var ol=console.log;' +
+      'console.log=function(){var a=Array.prototype.slice.call(arguments);c.innerHTML+=a.join(" ")+"\\n";ol.apply(console,a);};' +
+      'window.onerror=function(m){c.innerHTML+="ERROR: "+m+"\\n";};' +
+      '})();<\/script>';
     if (/<\/body>/i.test(fixed)) {
       fixed = fixed.replace(/<\/body>/i, consoleDiv + consoleScript + '</body>');
     } else {
       fixed += '\n' + consoleDiv + consoleScript;
     }
   }
-  
+
   return fixed;
 }
 
-// ---- Phase 3: Final Detection ----
+/* ── Phase 3: Detect Remaining Issues ───────────── */
 function detectRemainingIssues(html) {
   var issues = [];
-  
-  // Duplicate html/head/body
-  var countTag = function(tag, h) {
-    return (h.match(new RegExp('<' + tag + '[\\s>]', 'gi')) || []).length;
-  };
+
+  // Duplicate structural tags
   ['html', 'head', 'body'].forEach(function(tag) {
-    if (countTag(tag, html) > 1) {
+    var count = (html.match(new RegExp('<' + tag + '[\\s>]', 'gi')) || []).length;
+    if (count > 1)
       issues.push({ type: 'duplicate-' + tag, message: 'يوجد أكثر من وسم <' + tag + '>.', fix: null });
-    }
   });
-  
-  // Tag mismatch (excluding void elements and self-closing)
-  var voidElements = ['br','hr','img','input','meta','link','area','base','col','embed','source','track','wbr'];
+
+  // Mismatched open/close tag counts (excluding void elements and self-closing syntax)
+  var voidSet = { br:1,hr:1,img:1,input:1,meta:1,link:1,area:1,base:1,col:1,embed:1,source:1,track:1,wbr:1 };
   var tagRegex = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g;
-  var tagCounts = {};
-  var match;
-  while ((match = tagRegex.exec(html)) !== null) {
-    var tagName = match[2].toLowerCase();
-    var isClosing = match[1] === '/';
-    if (voidElements.indexOf(tagName) !== -1) continue;
-    var fullTag = match[0];
-    if (/\/\s*>$/.test(fullTag) && !isClosing) continue; // self-closing
-    if (!tagCounts[tagName]) tagCounts[tagName] = { open: 0, close: 0 };
-    if (isClosing) tagCounts[tagName].close++;
-    else tagCounts[tagName].open++;
+  var tagCounts = {}, m;
+  while ((m = tagRegex.exec(html)) !== null) {
+    var tn = m[2].toLowerCase();
+    if (voidSet[tn]) continue;
+    if (/\/\s*>$/.test(m[0]) && m[1] !== '/') continue;
+    if (!tagCounts[tn]) tagCounts[tn] = { open: 0, close: 0 };
+    if (m[1] === '/') tagCounts[tn].close++; else tagCounts[tn].open++;
   }
   var mismatched = [];
   for (var t in tagCounts) {
-    if (tagCounts[t].open !== tagCounts[t].close) {
+    if (tagCounts[t].open !== tagCounts[t].close)
       mismatched.push(t + ' (' + tagCounts[t].open + '/' + tagCounts[t].close + ')');
-    }
   }
-  if (mismatched.length) {
+  if (mismatched.length)
     issues.push({ type: 'tag-mismatch', message: 'وسوم غير متطابقة: ' + mismatched.join(', '), fix: null });
-  }
-  
-  // Duplicate IDs
-  var ids = html.match(/id\s*=\s*["']([^"']+)["']/gi) || [];
-  var idNames = ids.map(function(x) { return x.replace(/id\s*=\s*["']/i, '').replace(/["']/g, ''); });
-  var duplicates = idNames.filter(function(id, idx) { return idNames.indexOf(id) !== idx; });
-  if (duplicates.length) {
-    issues.push({ type: 'duplicate-id', message: 'معرفات id مكررة: ' + duplicates.slice(0,3).join(', '), fix: null });
-  }
-  
-  // Img without alt
+
+  // Duplicate id attributes
+  var idMatches = html.match(/\bid\s*=\s*["']([^"']+)["']/gi) || [];
+  var idNames = idMatches.map(function(x) { return x.replace(/\bid\s*=\s*["']/i,'').replace(/["']/g,''); });
+  var idSeen = {}, dupIds = [];
+  idNames.forEach(function(id) {
+    if (idSeen[id]) { if (dupIds.indexOf(id) === -1) dupIds.push(id); }
+    else idSeen[id] = true;
+  });
+  if (dupIds.length)
+    issues.push({ type: 'duplicate-id', message: 'معرفات id مكررة: ' + dupIds.slice(0,3).join(', '), fix: null });
+
+  // Images without alt attribute
   var imgs = html.match(/<img[^>]*>/gi) || [];
-  var noAlt = imgs.filter(function(img) { return !/alt\s*=/i.test(img); });
+  var noAlt = imgs.filter(function(img) { return !/\balt\s*=/i.test(img); });
   if (noAlt.length) {
     issues.push({
       type: 'img-no-alt',
       message: 'عدد ' + noAlt.length + ' صورة بدون سمة alt.',
       fix: function(h) {
-        return h.replace(/<img([^>]*)>/gi, function(m, attrs) {
-          if (/alt\s*=/i.test(attrs)) return m;
+        return h.replace(/<img([^>]*)>/gi, function(full, attrs) {
+          if (/\balt\s*=/i.test(attrs)) return full;
           return '<img' + attrs + ' alt="">';
         });
       }
     });
   }
-  
-  // Obsolete tags
+
+  // Obsolete tags: center, font, marquee
   var obsolete = html.match(/<(center|font|marquee)[\s>]/gi);
   if (obsolete) {
+    var uniqueObs = obsolete.filter(function(v,i,a){ return a.indexOf(v)===i; });
     issues.push({
       type: 'obsolete-tags',
-      message: 'وسوم قديمة: ' + obsolete.join(', '),
+      message: 'وسوم قديمة: ' + uniqueObs.join(', '),
       fix: function(h) {
-        h = h.replace(/<center([\s>])/gi, '<div style="text-align:center"$1').replace(/<\/center>/gi, '</div>');
-        h = h.replace(/<font([\s>])/gi, '<span$1').replace(/<\/font>/gi, '</span>');
-        h = h.replace(/<marquee([\s>])/gi, '<div$1').replace(/<\/marquee>/gi, '</div>');
+        h = h.replace(/<center(\s[^>]*)?>/gi, '<div style="text-align:center"$1>').replace(/<\/center>/gi, '</div>');
+        h = h.replace(/<font(\s[^>]*)?>/gi, '<span$1>').replace(/<\/font>/gi, '</span>');
+        h = h.replace(/<marquee(\s[^>]*)?>/gi, '<div$1>').replace(/<\/marquee>/gi, '</div>');
         return h;
       }
     });
   }
-  
-  // Input without type
-  if (/<input\s(?!type)/i.test(html) || /<input\s*>/i.test(html)) {
+
+  // Input elements without a type attribute
+  // Uses negative lookahead so inputs that already have type= are never touched
+  if (/<input(?:\s(?!type\s*=)[^>]*|\s*>)/i.test(html)) {
     issues.push({
       type: 'input-no-type',
       message: 'عناصر input بدون type.',
       fix: function(h) {
-        return h.replace(/<input\s/gi, '<input type="text" ').replace(/<input>/gi, '<input type="text">');
+        // Only insert type="text" when the input tag has no type= attribute
+        return h.replace(/<input(\s(?!type\s*=)[^>]*|>)/gi, function(full, rest) {
+          return '<input type="text"' + rest;
+        });
       }
     });
   }
-  
-  // @import with http
-  if (/@import\s+url\(["']?http:/.test(html)) {
+
+  // @import over http (warning only)
+  if (/@import\s+(?:url\(["']?)?http:/.test(html))
     issues.push({ type: 'css-import-http', message: 'يوجد @import برابط http.', fix: null });
-  }
-  
-  // Script src http
-  if (/<script[^>]+src\s*=\s*["']http:/.test(html)) {
-    issues.push({ type: 'script-src-http', message: 'سكريبت خارجي http.', fix: null });
-  }
-  
-  // Bracket mismatch in JS
-  var jsCode = '';
-  var scriptMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
-  if (scriptMatches) {
-    jsCode = scriptMatches.join('');
-  }
-  var countChar = function(code, ch) { return (code.match(new RegExp('\\' + ch, 'g')) || []).length; };
-  if (countChar(jsCode, '{') !== countChar(jsCode, '}')) {
-    issues.push({ type: 'js-brace-mismatch', message: 'الأقواس { } غير متطابقة في JavaScript.', fix: null });
-  }
-  if (countChar(jsCode, '[') !== countChar(jsCode, ']')) {
+
+  // <script src="http:..."> (warning only)
+  if (/<script[^>]+src\s*=\s*["']http:/.test(html))
+    issues.push({ type: 'script-src-http', message: 'سكريبت خارجي برابط http.', fix: null });
+
+  // JavaScript bracket balance (warnings only)
+  var scriptBlocks = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
+  var jsCode = scriptBlocks.join('');
+  function countOccurrences(str, ch) { return str.split(ch).length - 1; }
+  if (countOccurrences(jsCode, '{') !== countOccurrences(jsCode, '}'))
+    issues.push({ type: 'js-brace-mismatch',   message: 'الأقواس { } غير متطابقة في JavaScript.', fix: null });
+  if (countOccurrences(jsCode, '[') !== countOccurrences(jsCode, ']'))
     issues.push({ type: 'js-bracket-mismatch', message: 'الأقواس [ ] غير متطابقة في JavaScript.', fix: null });
-  }
-  if (countChar(jsCode, '(') !== countChar(jsCode, ')')) {
-    issues.push({ type: 'js-paren-mismatch', message: 'الأقواس ( ) غير متطابقة في JavaScript.', fix: null });
-  }
-  
-  // eval usage
-  if (/eval\s*\(/.test(html)) {
-    issues.push({ type: 'eval', message: 'استخدام eval() خطر أمنياً.', fix: null });
-  }
-  
-  // innerHTML with variable (security warning)
-  if (/\.innerHTML\s*=/.test(html)) {
-    issues.push({ type: 'innerHTML', message: 'استخدام innerHTML قد يسبب XSS.', fix: null });
-  }
-  
+  if (countOccurrences(jsCode, '(') !== countOccurrences(jsCode, ')'))
+    issues.push({ type: 'js-paren-mismatch',   message: 'الأقواس ( ) غير متطابقة في JavaScript.', fix: null });
+
+  // Security warnings
+  if (/\beval\s*\(/.test(html))
+    issues.push({ type: 'eval',       message: 'استخدام eval() خطر أمنياً.', fix: null });
+  if (/\.innerHTML\s*=/.test(html))
+    issues.push({ type: 'innerHTML',  message: 'استخدام innerHTML قد يسبب XSS.', fix: null });
+
   return issues;
 }
 
-function renderIssueModal(issues, previewContent) {
+/* ── Render Issue Modal ───────────────────────────── */
+function renderIssueModal(issues) {
+  var hasFixable = issues.some(function(iss) { return !!iss.fix; });
+
   if (!issues.length) {
     issueBody.innerHTML = '<div class="issue-empty">✅ لا توجد مشاكل، الكود جاهز للمعاينة.</div>';
     issueFixAll.style.display = 'none';
     issuePreviewRaw.style.display = 'none';
     setTimeout(function() {
       issueOverlay.classList.remove('show');
-      openPreviewWithContent(previewContent);
+      openPreviewWithContent(previewContentCache);
     }, 400);
-  } else {
-    var html = '';
-    for (var i = 0; i < issues.length; i++) {
-      var iss = issues[i];
-      html += '<div class="issue-item">';
-      html += '<span class="issue-icon">⚠️</span>';
-      html += '<span class="issue-text">' + iss.message + '</span>';
-      if (iss.fix) {
-        html += '<button class="issue-fix-btn" data-issue-idx="' + i + '">إصلاح</button>';
-      } else {
-        html += '<span style="color: var(--fg3); font-size:11px;">يدوي</span>';
-      }
-      html += '</div>';
-    }
-    issueBody.innerHTML = html;
-    issueFixAll.style.display = 'inline-block';
-    issuePreviewRaw.style.display = 'inline-block';
-
-    var fixBtns = issueBody.querySelectorAll('.issue-fix-btn');
-    for (var b = 0; b < fixBtns.length; b++) {
-      fixBtns[b].addEventListener('click', function(e) {
-        var idx = parseInt(this.getAttribute('data-issue-idx'));
-        var issue = detectedIssues[idx];
-        if (issue && issue.fix) {
-          previewContentCache = issue.fix(previewContentCache);
-          // Re-detect only remaining issues (no silent fixes again)
-          detectedIssues = detectRemainingIssues(previewContentCache);
-          renderIssueModal(detectedIssues, previewContentCache);
-        }
-      });
-    }
+    return;
   }
+
+  var html = '';
+  for (var i = 0; i < issues.length; i++) {
+    var iss = issues[i];
+    html += '<div class="issue-item">';
+    html += '<span class="issue-icon">⚠️</span>';
+    html += '<span class="issue-text">' + iss.message + '</span>';
+    if (iss.fix) {
+      html += '<button class="issue-fix-btn" data-issue-idx="' + i + '">إصلاح</button>';
+    } else {
+      html += '<span style="color: var(--fg3); font-size:11px;">يدوي</span>';
+    }
+    html += '</div>';
+  }
+  issueBody.innerHTML = html;
+  issueFixAll.style.display = hasFixable ? 'inline-block' : 'none';
+  issuePreviewRaw.style.display = 'inline-block';
+
+  // Individual fix buttons — apply only that one fix, then re-detect (no phases 1/2)
+  issueBody.querySelectorAll('.issue-fix-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var idx = parseInt(this.getAttribute('data-issue-idx'), 10);
+      var issue = detectedIssues[idx];
+      if (!issue || !issue.fix) return;
+      previewContentCache = issue.fix(previewContentCache);
+      detectedIssues = detectRemainingIssues(previewContentCache);
+      renderIssueModal(detectedIssues);
+    });
+  });
 }
 
+/* ── Preview helpers ─────────────────────────────── */
 function openPreviewWithContent(content) {
   previewFrame.srcdoc = content;
   previewOverlay.classList.add('show');
@@ -787,24 +798,20 @@ closePreviewBtn.addEventListener('touchend', function(e) {
 });
 
 previewOverlay.addEventListener('click', function(e) {
-  if (e.target === previewOverlay) {
-    closePreviewFn();
-  }
+  if (e.target === previewOverlay) closePreviewFn();
 });
 
+/* ── Play button: runs the full 3-phase pipeline once ── */
 function handlePlayClick() {
-  var combined = buildMultiFilePreview();
-  // Phase 1: Smart Assembly
-  var assembled = assembleFullPage(combined);
-  // Phase 2: Silent Fixes
-  var fixed = applySilentFixes(assembled);
+  var combined  = buildMultiFilePreview();
+  var assembled = assembleFullPage(combined);   // Phase 1 — silent
+  var fixed     = applySilentFixes(assembled);  // Phase 2 — silent
   previewContentCache = fixed;
-  // Phase 3: Final Detection
-  detectedIssues = detectRemainingIssues(fixed);
+  detectedIssues = detectRemainingIssues(fixed); // Phase 3 — user-visible
   if (detectedIssues.length === 0) {
     openPreviewWithContent(fixed);
   } else {
-    renderIssueModal(detectedIssues, fixed);
+    renderIssueModal(detectedIssues);
     issueOverlay.classList.add('show');
   }
 }
@@ -813,28 +820,32 @@ playBtn.addEventListener('click', handlePlayClick);
 issueCloseBtn.addEventListener('click', function() {
   issueOverlay.classList.remove('show');
 });
+
 issuePreviewRaw.addEventListener('click', function() {
   issueOverlay.classList.remove('show');
   openPreviewWithContent(previewContentCache);
 });
+
+// Fix All: apply every fixable issue in one pass, then re-detect once (phases 1/2 never re-run)
 issueFixAll.addEventListener('click', function() {
+  var snapshot = previewContentCache;
   for (var i = 0; i < detectedIssues.length; i++) {
     if (detectedIssues[i].fix) {
-      previewContentCache = detectedIssues[i].fix(previewContentCache);
+      snapshot = detectedIssues[i].fix(snapshot);
     }
   }
+  previewContentCache = snapshot;
   detectedIssues = detectRemainingIssues(previewContentCache);
   if (detectedIssues.length === 0) {
     issueOverlay.classList.remove('show');
     openPreviewWithContent(previewContentCache);
   } else {
-    renderIssueModal(detectedIssues, previewContentCache);
+    renderIssueModal(detectedIssues);
   }
 });
+
 issueOverlay.addEventListener('click', function(e) {
-  if (e.target === issueOverlay) {
-    issueOverlay.classList.remove('show');
-  }
+  if (e.target === issueOverlay) issueOverlay.classList.remove('show');
 });
 
 /* ═══════════ ESCAPE KEY HANDLING ═══════════ */
