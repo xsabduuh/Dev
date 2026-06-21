@@ -495,23 +495,79 @@ function buildMultiFilePreview(){
   return result;
 }
 
-/* ═══════════ ISSUE DETECTION & FIX (NEW SYSTEM) ═══════════ */
+/* ═══════════ NEW SMART PIPELINE ═══════════ */
 var detectedIssues = [];
 var previewContentCache = '';
 
-// ========== PHASE 1: Silent Auto-Fixes ==========
-function applySilentAutoFixes(html) {
+// ---- Phase 1: Smart Assembly ----
+function assembleFullPage(raw) {
+  // 1. Strip Markdown fences
+  var code = raw.replace(/```[\w-]*\s*\n?/g, '').replace(/```/g, '');
+  
+  // Check if it's pure CSS or pure JS
+  var hasTags = /<[a-zA-Z][^>]*>/.test(code);
+  var isCSS = !hasTags && /[{;]\s*\n?\s*[a-zA-Z-]+\s*:/.test(code);
+  var isJS = !hasTags && /\b(function|const|let|var|=>|console\.log|alert|document\.)\b/.test(code);
+  
+  if (isCSS) {
+    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n<style>\n' + code + '\n</style>\n</head>\n<body>\n</body>\n</html>';
+  }
+  if (isJS) {
+    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n</head>\n<body>\n<script>\n' + code + '\n<\/script>\n</body>\n</html>';
+  }
+  
+  // It's HTML (maybe partial)
+  var doctypePresent = /<!DOCTYPE\s+html/i.test(code);
+  var htmlTagPresent = /<html[\s>]/i.test(code);
+  var headPresent = /<head[\s>]/i.test(code);
+  var bodyPresent = /<body[\s>]/i.test(code);
+  
+  var result = code;
+  
+  // If no DOCTYPE and no html tag, wrap everything
+  if (!htmlTagPresent) {
+    result = '<!DOCTYPE html>\n<html lang="en">\n' + result + '\n</html>';
+  } else if (!doctypePresent) {
+    result = '<!DOCTYPE html>\n' + result;
+  }
+  
+  // Now ensure <head> and <body> exist
+  if (!/<head[\s>]/i.test(result) && !/<body[\s>]/i.test(result)) {
+    // No head and no body: add them
+    result = result.replace(/(<html[^>]*>)/i, '$1\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n</head>\n<body>')
+                   .replace(/<\/html>/i, '</body>\n</html>');
+  } else {
+    // Head exists but maybe missing essentials
+    if (/<head[\s>]/i.test(result)) {
+      if (!/<meta[^>]*charset/i.test(result)) {
+        result = result.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">');
+      }
+      if (!/<meta[^>]*name\s*=\s*["']viewport["'][^>]*>/i.test(result)) {
+        result = result.replace(/(<head[^>]*>)/i, '$1\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
+      }
+      if (!/<title[^>]*>/i.test(result)) {
+        result = result.replace(/<\/head>/i, '<title>Preview</title>\n</head>');
+      }
+    }
+    if (!/<body[\s>]/i.test(result)) {
+      result = result.replace(/<\/head>/i, '</head>\n<body>')
+                     .replace(/<\/html>/i, '</body>\n</html>');
+    }
+  }
+  
+  return result;
+}
+
+// ---- Phase 2: Silent Fixes ----
+function applySilentFixes(html) {
   var fixed = html;
   
-  // Remove Markdown fences
-  fixed = fixed.replace(/```[\w-]*\s*\n?/g, '').replace(/```/g, '');
-  
-  // Fix self-closing block tags: <div/> -> <div></div> (with or without attributes)
+  // Self-closing block tags -> proper pairs
   fixed = fixed.replace(/<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*)?\/\s*>/gi, function(m, tag, attrs) {
     return '<' + tag + (attrs || '') + '></' + tag + '>';
   });
   
-  // Add px to unitless CSS values (except 0)
+  // Unitless numeric CSS values -> add px (except 0)
   fixed = fixed.replace(/:\s*(\d+)(?![a-zA-Z%])\s*;/g, function(match, num) {
     return num === '0' ? match : ': ' + num + 'px;';
   });
@@ -519,158 +575,50 @@ function applySilentAutoFixes(html) {
   // Comment out document.write
   fixed = fixed.replace(/^([ \t]*)document\.write/gm, '$1// document.write');
   
-  // Fix missing ) before { in if statements
-  fixed = fixed.replace(/(if\s*\([^{]*?) \{/g, '$1) {');
+  // Fix missing ) before { in if/while/for
+  fixed = fixed.replace(/(if|while|for)\s*\(([^{}]*?)\s*\{/g, function(m, keyword, cond) {
+    return keyword + '(' + cond + ') {';
+  });
   
-  // Add console div if console.log exists and no console div present
+  // Add console div if console.log used and no console element
   if (/console\.log\(/.test(fixed) && !/id\s*=\s*["']console["']/.test(fixed)) {
     var consoleDiv = '<div id="console" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#111;color:#0f0;font-family:monospace;overflow:auto;padding:8px;border-top:1px solid #333;z-index:9999;"></div>';
-    var script = '<script>(function(){var c=document.getElementById("console");if(!c)return;var oldLog=console.log;console.log=function(){var args=Array.prototype.slice.call(arguments);c.innerHTML+=args.join(" ")+"\\n";oldLog.apply(console,args);};window.onerror=function(m,s,l,cl,er){c.innerHTML+="ERROR: "+m+"\\n";};})();<\/script>';
+    var consoleScript = '<script>(function(){var c=document.getElementById("console");if(!c)return;var oldLog=console.log;console.log=function(){var args=Array.prototype.slice.call(arguments);c.innerHTML+=args.join(" ")+"\\n";oldLog.apply(console,args);};window.onerror=function(m,s,l,cl,er){c.innerHTML+="ERROR: "+m+"\\n";};})();<\/script>';
     if (/<\/body>/i.test(fixed)) {
-      fixed = fixed.replace(/<\/body>/i, consoleDiv + script + '</body>');
+      fixed = fixed.replace(/<\/body>/i, consoleDiv + consoleScript + '</body>');
     } else {
-      fixed = fixed + consoleDiv + script;
+      fixed += '\n' + consoleDiv + consoleScript;
     }
   }
   
   return fixed;
 }
 
-// ========== PHASE 2: Detect remaining issues ==========
-function detectRemainingIssues(cleaned) {
+// ---- Phase 3: Final Detection ----
+function detectRemainingIssues(html) {
   var issues = [];
-  var hasTags = /<[a-zA-Z][^>]*>/.test(cleaned);
   
-  if (!/<!DOCTYPE\s+html/i.test(cleaned)) {
-    issues.push({
-      type: 'no-doctype',
-      message: 'لا يوجد <!DOCTYPE html>. قد يعمل المتصفح في وضع المراوغات.',
-      fix: function(h) { return '<!DOCTYPE html>\n' + h; }
-    });
-  }
-  
-  if (!/<html[\s>]/i.test(cleaned)) {
-    issues.push({
-      type: 'no-html-tag',
-      message: 'لا يوجد وسم <html>. ستتم إضافته.',
-      fix: function(h) { return '<!DOCTYPE html>\n<html>\n' + h + '\n</html>'; }
-    });
-  }
-  
-  if (hasTags && !/<head[\s>]/i.test(cleaned) && !/<body[\s>]/i.test(cleaned)) {
-    issues.push({
-      type: 'no-head-body',
-      message: 'يحتوي وسوماً HTML لكن بدون <head> أو <body>. سيتم إضافتهما.',
-      fix: function(h) {
-        return h.replace(/(<html[^>]*>)/i, '$1\n<head><meta charset="UTF-8"></head>\n<body>')
-                .replace(/<\/html>/i, '</body>\n</html>');
-      }
-    });
-  }
-  
+  // Duplicate html/head/body
   var countTag = function(tag, h) {
     return (h.match(new RegExp('<' + tag + '[\\s>]', 'gi')) || []).length;
   };
   ['html', 'head', 'body'].forEach(function(tag) {
-    if (countTag(tag, cleaned) > 1) {
-      issues.push({
-        type: 'duplicate-' + tag,
-        message: 'يوجد أكثر من وسم <' + tag + '>. قد يسبب سلوكاً غير متوقع.',
-        fix: null
-      });
+    if (countTag(tag, html) > 1) {
+      issues.push({ type: 'duplicate-' + tag, message: 'يوجد أكثر من وسم <' + tag + '>.', fix: null });
     }
   });
   
-  if (hasTags && /<head/i.test(cleaned) && !/<meta[^>]*charset/i.test(cleaned)) {
-    issues.push({
-      type: 'no-charset',
-      message: 'لا يوجد <meta charset="UTF-8">. قد تظهر الرموز مشوهة.',
-      fix: function(h) { return h.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">'); }
-    });
-  }
-  
-  if (hasTags && /<head/i.test(cleaned) && !/<meta[^>]*name\s*=\s*["']viewport["'][^>]*>/i.test(cleaned)) {
-    issues.push({
-      type: 'no-viewport',
-      message: 'لا يوجد <meta viewport>. التصميم لن يتجاوب على الجوال.',
-      fix: function(h) { return h.replace(/(<head[^>]*>)/i, '$1\n<meta name="viewport" content="width=device-width, initial-scale=1.0">'); }
-    });
-  }
-  
-  if (hasTags && /<head/i.test(cleaned) && !/<title[^>]*>/i.test(cleaned)) {
-    issues.push({
-      type: 'no-title',
-      message: 'لا يوجد وسم <title> في الرأس.',
-      fix: function(h) { return h.replace(/<\/head>/i, '<title>Preview</title>\n</head>'); }
-    });
-  }
-  
-  if ((cleaned.match(/<title[^>]*>/gi) || []).length > 1) {
-    issues.push({ type: 'multi-title', message: 'يوجد أكثر من وسم <title>.', fix: null });
-  }
-  
-  if (!hasTags && /[{;]\s*\n?\s*[a-zA-Z-]+\s*:/.test(cleaned)) {
-    issues.push({
-      type: 'pure-css',
-      message: 'يبدو أنه كود CSS خالص. سيتم تغليفه بصفحة.',
-      fix: function(h) {
-        return '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">\n<style>\n' + h + '\n</style></head><body></body></html>';
-      }
-    });
-  }
-  
-  if (!hasTags && /\b(function|const|let|var|=>|console\.log|alert|document\.)\b/.test(cleaned)) {
-    issues.push({
-      type: 'pure-js',
-      message: 'يبدو أنه كود JavaScript خالص. سيتم تغليفه بصفحة.',
-      fix: function(h) {
-        return '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>\n<script>\n' + h + '\n<\/script></body></html>';
-      }
-    });
-  }
-  
-  if (hasTags && /\b[a-zA-Z-]+\s*:\s*[^;]+;/.test(cleaned) && !/<style[^>]*>/i.test(cleaned)) {
-    issues.push({
-      type: 'css-outside-style',
-      message: 'توجد خواص CSS خارج وسم <style>. ستُنقل إليه.',
-      fix: function(h) {
-        var cssBlocks = h.match(/\b[a-zA-Z-]+\s*:\s*[^;]+;/g);
-        if (cssBlocks) {
-          var styleTag = '\n<style>\n' + cssBlocks.join('\n') + '\n</style>\n';
-          return h.replace(/(<head[^>]*>)/i, '$1' + styleTag);
-        }
-        return h;
-      }
-    });
-  }
-  
-  if (hasTags && /\b(function|const|let|var|=>|console\.log)\b/.test(cleaned) && !/<script[^>]*>/i.test(cleaned)) {
-    issues.push({
-      type: 'js-outside-script',
-      message: 'كود JavaScript مبعثر خارج وسم <script>. ستُنقل إليه.',
-      fix: function(h) {
-        var jsPattern = /(?:function\s+\w+\s*\(.*?\)\s*\{[^}]*\}|const\s+\w+\s*=\s*[^;]+;|let\s+\w+\s*=\s*[^;]+;|var\s+\w+\s*=\s*[^;]+;|console\.log\([^)]*\);?)/g;
-        var jsCode = h.match(jsPattern);
-        if (jsCode) {
-          var scriptTag = '\n<script>\n' + jsCode.join('\n') + '\n<\/script>\n';
-          return h.replace(/<\/body>/i, scriptTag + '</body>');
-        }
-        return h;
-      }
-    });
-  }
-  
-  // Mismatched HTML tags
+  // Tag mismatch (excluding void elements and self-closing)
   var voidElements = ['br','hr','img','input','meta','link','area','base','col','embed','source','track','wbr'];
   var tagRegex = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g;
   var tagCounts = {};
   var match;
-  while ((match = tagRegex.exec(cleaned)) !== null) {
+  while ((match = tagRegex.exec(html)) !== null) {
     var tagName = match[2].toLowerCase();
     var isClosing = match[1] === '/';
     if (voidElements.indexOf(tagName) !== -1) continue;
     var fullTag = match[0];
-    if (/\/\s*>$/.test(fullTag) && !isClosing) continue;
+    if (/\/\s*>$/.test(fullTag) && !isClosing) continue; // self-closing
     if (!tagCounts[tagName]) tagCounts[tagName] = { open: 0, close: 0 };
     if (isClosing) tagCounts[tagName].close++;
     else tagCounts[tagName].open++;
@@ -682,32 +630,24 @@ function detectRemainingIssues(cleaned) {
     }
   }
   if (mismatched.length) {
-    issues.push({
-      type: 'tag-mismatch',
-      message: 'وسوم غير متطابقة: ' + mismatched.join(', '),
-      fix: null
-    });
+    issues.push({ type: 'tag-mismatch', message: 'وسوم غير متطابقة: ' + mismatched.join(', '), fix: null });
   }
   
   // Duplicate IDs
-  var ids = cleaned.match(/id\s*=\s*["']([^"']+)["']/gi) || [];
+  var ids = html.match(/id\s*=\s*["']([^"']+)["']/gi) || [];
   var idNames = ids.map(function(x) { return x.replace(/id\s*=\s*["']/i, '').replace(/["']/g, ''); });
   var duplicates = idNames.filter(function(id, idx) { return idNames.indexOf(id) !== idx; });
   if (duplicates.length) {
-    issues.push({
-      type: 'duplicate-id',
-      message: 'معرفات id مكررة: ' + duplicates.slice(0,3).join(', '),
-      fix: null
-    });
+    issues.push({ type: 'duplicate-id', message: 'معرفات id مكررة: ' + duplicates.slice(0,3).join(', '), fix: null });
   }
   
   // Img without alt
-  var imgs = cleaned.match(/<img[^>]*>/gi) || [];
+  var imgs = html.match(/<img[^>]*>/gi) || [];
   var noAlt = imgs.filter(function(img) { return !/alt\s*=/i.test(img); });
   if (noAlt.length) {
     issues.push({
       type: 'img-no-alt',
-      message: 'عدد ' + noAlt.length + ' صورة بدون سمة alt. ستضاف تلقائياً.',
+      message: 'عدد ' + noAlt.length + ' صورة بدون سمة alt.',
       fix: function(h) {
         return h.replace(/<img([^>]*)>/gi, function(m, attrs) {
           if (/alt\s*=/i.test(attrs)) return m;
@@ -718,11 +658,11 @@ function detectRemainingIssues(cleaned) {
   }
   
   // Obsolete tags
-  var obsolete = cleaned.match(/<(center|font|marquee)[\s>]/gi);
+  var obsolete = html.match(/<(center|font|marquee)[\s>]/gi);
   if (obsolete) {
     issues.push({
       type: 'obsolete-tags',
-      message: 'وسوم قديمة غير مدعومة (center, font, marquee). ستستبدل بعناصر حديثة.',
+      message: 'وسوم قديمة: ' + obsolete.join(', '),
       fix: function(h) {
         h = h.replace(/<center([\s>])/gi, '<div style="text-align:center"$1').replace(/<\/center>/gi, '</div>');
         h = h.replace(/<font([\s>])/gi, '<span$1').replace(/<\/font>/gi, '</span>');
@@ -732,39 +672,32 @@ function detectRemainingIssues(cleaned) {
     });
   }
   
-  if (/<html/i.test(cleaned) && !/<html[^>]*\slang\s*=/i.test(cleaned)) {
-    issues.push({
-      type: 'no-lang',
-      message: 'وسم <html> بدون سمة lang. ستضاف lang="en".',
-      fix: function(h) { return h.replace(/<html/i, '<html lang="en"'); }
-    });
-  }
-  
-  if (/<input\s(?!type)/i.test(cleaned) || /<input\s*>/i.test(cleaned)) {
+  // Input without type
+  if (/<input\s(?!type)/i.test(html) || /<input\s*>/i.test(html)) {
     issues.push({
       type: 'input-no-type',
-      message: 'عناصر input بدون type. سيتم افتراض type="text".',
+      message: 'عناصر input بدون type.',
       fix: function(h) {
-        return h.replace(/<input\s/gi, '<input type="text" ')
-                .replace(/<input>/gi, '<input type="text">');
+        return h.replace(/<input\s/gi, '<input type="text" ').replace(/<input>/gi, '<input type="text">');
       }
     });
   }
   
-  if (/@import\s+url\(["']?http:/.test(cleaned)) {
-    issues.push({ type: 'css-import-http', message: 'يوجد @import برابط http قد يُمنع.', fix: null });
+  // @import with http
+  if (/@import\s+url\(["']?http:/.test(html)) {
+    issues.push({ type: 'css-import-http', message: 'يوجد @import برابط http.', fix: null });
   }
   
-  if (/<script[^>]+src\s*=\s*["']http:/.test(cleaned)) {
-    issues.push({ type: 'script-src-http', message: 'سكريبت خارجي من رابط http قد يمنع.', fix: null });
+  // Script src http
+  if (/<script[^>]+src\s*=\s*["']http:/.test(html)) {
+    issues.push({ type: 'script-src-http', message: 'سكريبت خارجي http.', fix: null });
   }
   
+  // Bracket mismatch in JS
   var jsCode = '';
-  var scriptMatches = cleaned.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
+  var scriptMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
   if (scriptMatches) {
     jsCode = scriptMatches.join('');
-  } else if (!hasTags) {
-    jsCode = cleaned;
   }
   var countChar = function(code, ch) { return (code.match(new RegExp('\\' + ch, 'g')) || []).length; };
   if (countChar(jsCode, '{') !== countChar(jsCode, '}')) {
@@ -775,6 +708,16 @@ function detectRemainingIssues(cleaned) {
   }
   if (countChar(jsCode, '(') !== countChar(jsCode, ')')) {
     issues.push({ type: 'js-paren-mismatch', message: 'الأقواس ( ) غير متطابقة في JavaScript.', fix: null });
+  }
+  
+  // eval usage
+  if (/eval\s*\(/.test(html)) {
+    issues.push({ type: 'eval', message: 'استخدام eval() خطر أمنياً.', fix: null });
+  }
+  
+  // innerHTML with variable (security warning)
+  if (/\.innerHTML\s*=/.test(html)) {
+    issues.push({ type: 'innerHTML', message: 'استخدام innerHTML قد يسبب XSS.', fix: null });
   }
   
   return issues;
@@ -814,6 +757,7 @@ function renderIssueModal(issues, previewContent) {
         var issue = detectedIssues[idx];
         if (issue && issue.fix) {
           previewContentCache = issue.fix(previewContentCache);
+          // Re-detect only remaining issues (no silent fixes again)
           detectedIssues = detectRemainingIssues(previewContentCache);
           renderIssueModal(detectedIssues, previewContentCache);
         }
@@ -850,13 +794,17 @@ previewOverlay.addEventListener('click', function(e) {
 
 function handlePlayClick() {
   var combined = buildMultiFilePreview();
-  var autoFixed = applySilentAutoFixes(combined);
-  previewContentCache = autoFixed;
-  detectedIssues = detectRemainingIssues(autoFixed);
+  // Phase 1: Smart Assembly
+  var assembled = assembleFullPage(combined);
+  // Phase 2: Silent Fixes
+  var fixed = applySilentFixes(assembled);
+  previewContentCache = fixed;
+  // Phase 3: Final Detection
+  detectedIssues = detectRemainingIssues(fixed);
   if (detectedIssues.length === 0) {
-    openPreviewWithContent(autoFixed);
+    openPreviewWithContent(fixed);
   } else {
-    renderIssueModal(detectedIssues, autoFixed);
+    renderIssueModal(detectedIssues, fixed);
     issueOverlay.classList.add('show');
   }
 }
