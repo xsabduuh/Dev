@@ -28,7 +28,14 @@ body{height:100%;width:100%;overflow:hidden;background:#000;font-family:-apple-s
 button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:none;}
 
 /* Shell */
-.shell{display:flex;flex-direction:column;height:100dvh;width:100vw;overflow:hidden;position:fixed;inset:0;background:var(--bg);}
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
 
 /* Header */
 .header{display:flex;align-items:center;justify-content:space-between;height:var(--hh);background:var(--bg-s);border-bottom:1px solid var(--border);padding:0 16px;flex-shrink:0;position:relative;z-index:10;}
