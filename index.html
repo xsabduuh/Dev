@@ -339,9 +339,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
       <span>🔍 تدقيق الكود قبل المعاينة</span>
       <button class="issue-close" id="issueClose" title="إغلاق">✕</button>
     </div>
-    <div class="issue-body" id="issueBody">
-      <!-- تُملأ بالمشاكل -->
-    </div>
+    <div class="issue-body" id="issueBody"></div>
     <div class="issue-footer">
       <button class="issue-btn secondary" id="issuePreviewRaw">معاينة كما هي</button>
       <button class="issue-btn primary" id="issueFixAll">إصلاح الكل</button>
@@ -435,11 +433,11 @@ var savesList=document.getElementById('savesList');
 var playBtn=document.getElementById('playBtn');
 var previewOverlay=document.getElementById('previewOverlay');
 var previewFrame=document.getElementById('previewFrame');
-var closePreview=document.getElementById('closePreview');
+var closePreviewBtn=document.getElementById('closePreview');
 var toastEl=document.getElementById('toast');
 var issueOverlay=document.getElementById('issueOverlay');
 var issueBody=document.getElementById('issueBody');
-var issueClose=document.getElementById('issueClose');
+var issueCloseBtn=document.getElementById('issueClose');
 var issuePreviewRaw=document.getElementById('issuePreviewRaw');
 var issueFixAll=document.getElementById('issueFixAll');
 
@@ -983,17 +981,15 @@ function detectIssues(html) {
     issues.push({
       type: 'css-no-unit',
       message: 'قيم CSS بدون وحدة (مثل width:100;). قد لا تعمل. مثال: ' + unitless[0],
-      fix: null
+      fix: function(h) {
+        return h.replace(/:\s*(\d+)(?![a-zA-Z%])\s*;/g, ': $1px;');
+      }
     });
   }
 
   // 13. @import with http
   if (/@import\s+url\(["']?http:/.test(cleaned)) {
-    issues.push({
-      type: 'css-import-http',
-      message: 'يوجد @import برابط http، وقد يُمنع.',
-      fix: null
-    });
+    issues.push({ type: 'css-import-http', message: 'يوجد @import برابط http، وقد يُمنع.', fix: null });
   }
 
   // 14. Empty <style>
@@ -1031,19 +1027,17 @@ function detectIssues(html) {
 
   // 17. Script src http
   if (/<script[^>]+src\s*=\s*["']http:/.test(cleaned)) {
-    issues.push({
-      type: 'script-src-http',
-      message: 'سكريبت خارجي من رابط http قد يمنع.',
-      fix: null
-    });
+    issues.push({ type: 'script-src-http', message: 'سكريبت خارجي من رابط http قد يمنع.', fix: null });
   }
 
   // 18. document.write
   if (/document\.write\s*\(/.test(cleaned)) {
     issues.push({
       type: 'document-write',
-      message: 'استخدام document.write قد يفشل في المعاينة.',
-      fix: null
+      message: 'استخدام document.write قد يفشل في المعاينة. سيتم تعطيله مؤقتاً.',
+      fix: function(h) {
+        return h.replace(/document\.write/g, '// document.write');
+      }
     });
   }
 
@@ -1055,25 +1049,33 @@ function detectIssues(html) {
   }
   var countChar = function(code, ch) { return (code.match(new RegExp('\\' + ch, 'g')) || []).length; };
   if (countChar(jsCode, '(') !== countChar(jsCode, ')')) {
-    issues.push({ type: 'js-paren-mismatch', message: 'الأقواس ( ) غير متطابقة في JavaScript.', fix: null });
+    issues.push({ type: 'js-paren-mismatch', message: 'الأقواس ( ) غير متطابقة في JavaScript. يرجى التدقيق اليدوي.', fix: null });
   }
   if (countChar(jsCode, '{') !== countChar(jsCode, '}')) {
-    issues.push({ type: 'js-brace-mismatch', message: 'الأقواس { } غير متطابقة في JavaScript.', fix: null });
+    issues.push({ type: 'js-brace-mismatch', message: 'الأقواس { } غير متطابقة في JavaScript. يرجى التدقيق اليدوي.', fix: null });
   }
   if (countChar(jsCode, '[') !== countChar(jsCode, ']')) {
-    issues.push({ type: 'js-bracket-mismatch', message: 'الأقواس [ ] غير متطابقة في JavaScript.', fix: null });
+    issues.push({ type: 'js-bracket-mismatch', message: 'الأقواس [ ] غير متطابقة في JavaScript. يرجى التدقيق اليدوي.', fix: null });
   }
 
   // 20. console.log without visible console
   if (/console\.log\(/.test(cleaned)) {
     issues.push({
       type: 'console-log',
-      message: 'الكود يستخدم console.log، ولكن لا توجد نافذة Console في المعاينة.',
-      fix: null
+      message: 'الكود يستخدم console.log، سيتم إضافة نافذة Console للمعاينة.',
+      fix: function(h) {
+        var consoleDiv = '<div id="console" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#111;color:#0f0;font-family:monospace;overflow:auto;padding:8px;border-top:1px solid #333;z-index:9999;"></div>';
+        var script = '<script>(function(){var c=document.getElementById("console");if(!c)return;var oldLog=console.log;console.log=function(){var args=Array.prototype.slice.call(arguments);c.innerHTML+=args.join(" ")+"\\n";oldLog.apply(console,args);};window.onerror=function(m,s,l,cl,er){c.innerHTML+="ERROR: "+m+"\\n";};})();<\/script>';
+        if (/<\/body>/i.test(h)) {
+          return h.replace(/<\/body>/i, consoleDiv + script + '</body>');
+        } else {
+          return h + consoleDiv + script;
+        }
+      }
     });
   }
 
-  // 21. Mismatched HTML tags
+  // 21. Mismatched HTML tags (count all normal tags)
   var tagRegex = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g;
   var tagCounts = {};
   var match;
@@ -1099,12 +1101,14 @@ function detectIssues(html) {
     });
   }
 
-  // 22. Self-closing block tags
+  // 22. Self-closing block tags (div, span, etc.)
   if (/<(div|span|p|section|article|nav|header|footer|main|aside)\s[^>]*\/\s*>/gi.test(cleaned)) {
     issues.push({
       type: 'self-closing-block',
-      message: 'وسوم بلوك ذاتية الإغلاق (مثل <div/>) قد تفسر بشكل خاطئ.',
-      fix: null
+      message: 'وسوم بلوك ذاتية الإغلاق (مثل <div/>) قد تفسر بشكل خاطئ. سيتم إصلاحها.',
+      fix: function(h) {
+        return h.replace(/<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*?)\/\s*>/gi, '<$1$2></$1>');
+      }
     });
   }
 
@@ -1126,8 +1130,13 @@ function detectIssues(html) {
   if (noAlt.length) {
     issues.push({
       type: 'img-no-alt',
-      message: 'عدد ' + noAlt.length + ' صورة بدون سمة alt.',
-      fix: null
+      message: 'عدد ' + noAlt.length + ' صورة بدون سمة alt. سيتم إضافتها.',
+      fix: function(h) {
+        return h.replace(/<img([^>]*)>/gi, function(m, attrs) {
+          if (/alt\s*=/i.test(attrs)) return m;
+          return '<img' + attrs + ' alt="">';
+        });
+      }
     });
   }
 
@@ -1137,30 +1146,17 @@ function detectIssues(html) {
     issues.push({
       type: 'obsolete-tags',
       message: 'وسوم قديمة غير مدعومة جيداً: ' + obsolete.join(', '),
-      fix: null
+      fix: function(h) {
+        h = h.replace(/<center([\s>])/gi, '<div style="text-align:center"$1').replace(/<\/center>/gi, '</div>');
+        h = h.replace(/<font([\s>])/gi, '<span$1').replace(/<\/font>/gi, '</span>');
+        h = h.replace(/<marquee([\s>])/gi, '<div$1').replace(/<\/marquee>/gi, '</div>');
+        return h;
+      }
     });
   }
 
-  // 26. Unescaped entities
-  if (/&(?![a-zA-Z]{2,10};|#\d{1,4};|#x[0-9a-fA-F]+;)/.test(cleaned)) {
-    issues.push({
-      type: 'unescaped-entities',
-      message: 'رموز & غير محولة لكيانات HTML. قد تسبب أخطاء.',
-      fix: null
-    });
-  }
-
-  // 27. Extraneous text outside HTML
-  var textOnly = cleaned.replace(/<[^>]*>/g, '');
-  if (!hasTags && textOnly.trim().length > 0) {
-    // already pure text, not necessarily an issue
-  } else if (textOnly.trim().length > 0 && /[a-zA-Z]{3,}/.test(textOnly)) {
-    issues.push({
-      type: 'extraneous-text',
-      message: 'يوجد نص خارج وسوم HTML قد يكون شرحاً أو بقايا.',
-      fix: null
-    });
-  }
+  // 26. Unescaped entities (removed as false positive)
+  // 27. Extraneous text (removed)
 
   return issues;
 }
@@ -1212,6 +1208,29 @@ function openPreviewWithContent(content) {
   previewOverlay.classList.add('show');
 }
 
+function closePreviewFn() {
+  previewOverlay.classList.remove('show');
+  previewFrame.srcdoc = '';
+}
+
+// إصلاح زر الإغلاق: إضافة مستمع للمس والنقر
+closePreviewBtn.addEventListener('click', function(e) {
+  e.stopPropagation();
+  closePreviewFn();
+});
+closePreviewBtn.addEventListener('touchend', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  closePreviewFn();
+});
+
+// إغلاق المعاينة بالنقر على الخلفية
+previewOverlay.addEventListener('click', function(e) {
+  if (e.target === previewOverlay) {
+    closePreviewFn();
+  }
+});
+
 function handlePlayClick() {
   var combined = buildMultiFilePreview();
   previewContentCache = combined;
@@ -1226,7 +1245,7 @@ function handlePlayClick() {
 }
 playBtn.addEventListener('click', handlePlayClick);
 
-issueClose.addEventListener('click', function() {
+issueCloseBtn.addEventListener('click', function() {
   issueOverlay.classList.remove('show');
 });
 issuePreviewRaw.addEventListener('click', function() {
@@ -1265,8 +1284,7 @@ document.addEventListener('keydown',function(e){
       return;
     }
     if(previewOverlay.classList.contains('show')){
-      previewOverlay.classList.remove('show');
-      previewFrame.srcdoc = '';
+      closePreviewFn();
       return;
     }
     if(editingTabId !== null){
