@@ -101,12 +101,6 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 .dd-item:hover{background:var(--bg-hover);color:var(--fg);}
 .dd-item.danger:hover{background:rgba(255,83,112,.1);color:var(--red);}
 .dd-sep{height:1px;background:var(--border);margin:3px 0;}
-.rename-row{display:none;align-items:center;gap:6px;padding:7px 10px;}
-.rename-row.show{display:flex;}
-.rename-input{flex:1;min-width:0;background:var(--bg-s);border:1px solid var(--bhi);border-radius:6px;color:var(--fg);font-family:var(--mono);font-size:16px;padding:5px 8px;outline:none;transition:border-color .12s;}
-.rename-input:focus{border-color:var(--acc);}
-.rename-ok{width:28px;height:28px;border-radius:6px;background:var(--acc);border:none;color:#000;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:background .12s;}
-.rename-ok:hover{background:#d9a8ff;}
 
 /* Saved Files Panel */
 .saves-panel{position:fixed;inset:0;z-index:900;display:none;flex-direction:column;background:var(--bg);}
@@ -157,7 +151,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
     <div class="h-side l"></div>
     <span class="h-title">Editor</span>
     <div class="h-side r">
-      <button class="play-btn" id="playBtn" title="Preview">
+      <button class="play-btn" id="playBtn" title="Preview" aria-label="Preview">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
       </button>
     </div>
@@ -169,21 +163,21 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
     <div class="line-nums" id="lineNums"></div>
     <div class="editor-inner">
       <div class="hl-layer" id="hlLayer" aria-hidden="true"></div>
-      <textarea class="code-area" id="codeArea" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+      <textarea class="code-area" id="codeArea" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="Code Editor" role="textbox" aria-multiline="true"></textarea>
     </div>
   </div>
 
   <footer class="toolbar">
     <div class="tb-inner">
       <div style="display:flex; align-items:center; gap:10px;">
-        <button class="ic-btn" id="undoBtn" title="Undo" disabled>
+        <button class="ic-btn" id="undoBtn" title="Undo" disabled aria-label="Undo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
           </svg>
         </button>
 
         <div class="sel-wrap">
-          <button class="ic-btn" id="selAllBtn" title="Select All">
+          <button class="ic-btn" id="selAllBtn" title="Select All" aria-label="Select All">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
               <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
@@ -204,14 +198,14 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
           </div>
         </div>
 
-        <button class="ic-btn" id="redoBtn" title="Redo" disabled>
+        <button class="ic-btn" id="redoBtn" title="Redo" disabled aria-label="Redo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/>
           </svg>
         </button>
 
         <div class="menu-wrap">
-          <button class="ic-btn" id="menuBtn" title="Options">
+          <button class="ic-btn" id="menuBtn" title="Options" aria-label="Options">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
             </svg>
@@ -235,14 +229,6 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
                 <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
               </svg>Rename
             </button>
-            <div class="rename-row" id="renameRow">
-              <input class="rename-input" id="renameInput" type="text" placeholder="filename.js"/>
-              <button class="rename-ok" id="renameOk">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </button>
-            </div>
             <div class="dd-sep"></div>
             <button class="dd-item" id="addFileBtn">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -268,7 +254,7 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 <div class="saves-panel" id="savesPanel">
   <div class="saves-hd">
     <span class="saves-title">Saved Files</span>
-    <button class="saves-close" id="savesClose">
+    <button class="saves-close" id="savesClose" aria-label="Close saved files">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
       </svg>
@@ -278,8 +264,14 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 </div>
 
 <!-- Preview Overlay -->
+<!--
+  ⚠️ تنبيه أمني:
+  sandbox="allow-scripts allow-same-origin" يسمح بتشغيل السكريبتات والوصول إلى localStorage
+  داخل المعاينة، ولكنه يعرض أيضًا بيانات صفحة المحرر (مثل localStorage و cookies) للخطر
+  إذا كان كود المعاينة غير موثوق. استخدمه بحذر.
+-->
 <div class="preview-overlay" id="previewOverlay">
-  <button class="preview-close" id="closePreview" title="Close Preview">
+  <button class="preview-close" id="closePreview" title="Close Preview" aria-label="Close preview">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
       <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
     </svg>
@@ -369,9 +361,6 @@ var dropdown=document.getElementById('dropdown');
 var saveBtn=document.getElementById('saveBtn');
 var deleteBtn=document.getElementById('deleteBtn');
 var renameBtn=document.getElementById('renameBtn');
-var renameRow=document.getElementById('renameRow');
-var renameInput=document.getElementById('renameInput');
-var renameOk=document.getElementById('renameOk');
 var addFileBtn=document.getElementById('addFileBtn');
 var openSavesBtn=document.getElementById('openSavesBtn');
 var savesPanel=document.getElementById('savesPanel');
@@ -399,7 +388,8 @@ function renderLineNums(text){
   for(var i=1;i<=n;i++) h+='<div class="ln">'+i+'</div>';
   lineNums.innerHTML=h;
 }
-function renderHL(text){hlLayer.innerHTML=highlight(text)+'\n';}
+// تم إزالة '\n' الزائد الذي كان يسبب عدم تطابق أرقام الأسطر
+function renderHL(text){hlLayer.innerHTML=highlight(text);}
 function updateBtns(){
   undoBtn.disabled=!(undoSt[activeId]&&undoSt[activeId].length>0);
   redoBtn.disabled=!(redoSt[activeId]&&redoSt[activeId].length>0);
@@ -438,7 +428,7 @@ function renderTabs(){
         btn.appendChild(x);
       }
 
-      // Long press detection with flag (no preventDefault on touchstart)
+      // Long press detection with flag
       var pressStartTime = 0;
       var longPressed = false;
 
@@ -550,55 +540,6 @@ function cancelRename(){
   renderTabs();
 }
 
-/* ═══════════ SMART PASTE RENAME ═══════════ */
-function detectLanguage(content) {
-  if (/^\s*<!DOCTYPE html>/i.test(content) || /<html[\s>]/i.test(content) || /<head[\s>]/i.test(content) || /<body[\s>]/i.test(content)) {
-    return 'html';
-  }
-  if (/[.#]?[\w-]+(\s*,\s*[.#]?[\w-]+)*\s*\{[^}]*:[^}]*\}/.test(content) && !/<[a-z]+/i.test(content)) {
-    return 'css';
-  }
-  if (/\b(function|const|let|var|=>|import|export|class\s+\w+)\b/.test(content) && !/<[a-z]+/i.test(content)) {
-    return 'javascript';
-  }
-  return null;
-}
-
-function autoRenameAfterPaste() {
-  var f = getFile();
-  var content = f.content;
-  if (!content.trim()) return;
-  var lang = detectLanguage(content);
-  if (!lang) return;
-
-  var ext = (lang === 'html') ? '.html' : (lang === 'css' ? '.css' : '.js');
-  var currentName = f.name;
-  var currentLower = currentName.toLowerCase();
-  if (currentLower.endsWith(ext)) return;
-
-  var baseName = 'untitled' + ext;
-  var counter = 1;
-  var newName = baseName;
-  while (files.some(function(file){ return file.name.toLowerCase() === newName.toLowerCase(); })) {
-    newName = 'untitled' + counter + ext;
-    counter++;
-  }
-  f.name = newName;
-  renderTabs();
-  showToast('Renamed to ' + newName + ' (auto-detected)');
-}
-
-codeArea.addEventListener('paste', function() {
-  setTimeout(function() {
-    // إصلاح: إعادة التمرير إلى الأعلى بعد اللصق
-    codeArea.scrollTop = 0;
-    // مزامنة الطبقات الأخرى
-    hlLayer.scrollTop = 0;
-    lineNums.scrollTop = 0;
-    autoRenameAfterPaste();
-  }, 10);
-});
-
 /* ═══════════ UNDO / REDO ═══════════ */
 function initSt(id){if(!undoSt[id])undoSt[id]=[];if(!redoSt[id])redoSt[id]=[];}
 function pushUndo(snap){
@@ -647,11 +588,16 @@ codeArea.addEventListener('input',function(){
     if(val!==snap){pushUndo(snap);lastCommit=val;updateBtns();}
   },600);
 });
+
 codeArea.addEventListener('scroll',function(){
   hlLayer.scrollTop=codeArea.scrollTop;
   hlLayer.scrollLeft=codeArea.scrollLeft;
   lineNums.scrollTop=codeArea.scrollTop;
 });
+
+/* تم إزالة مستمع اللصق الذي كان يسبب قفزة للأعلى ويعيد التسمية تلقائياً */
+/* يمكن إضافة أي سلوك مخصص للصق هنا بدون تغيير التمرير */
+
 codeArea.addEventListener('keydown',function(e){
   if(e.key==='Tab'){
     e.preventDefault();
@@ -686,17 +632,11 @@ document.addEventListener('mousedown',function(e){if(!copyTip.contains(e.target)
 /* ═══════════ DROPDOWN ═══════════ */
 function closeDropdown(){
   dropdown.classList.remove('show');
-  renameRow.classList.remove('show');
-  renameBtn.style.display='';
 }
 
 menuBtn.addEventListener('click', function(e) {
   e.stopPropagation();
   dropdown.classList.toggle('show');
-  if (!dropdown.classList.contains('show')) {
-    renameRow.classList.remove('show');
-    renameBtn.style.display='';
-  }
 });
 
 function handleOutsideClick(e) {
@@ -768,7 +708,6 @@ function renderSavesList() {
             undoSt = {}; redoSt = {};
             files.forEach(function(f){ undoSt[f.id] = []; redoSt[f.id] = []; });
             activeId = files[0].id;
-            // الإصلاح: التعامل مع المصفوفة الفارغة بأمان
             var maxId = files.length > 0 ? Math.max.apply(null, files.map(function(f){ return f.id; })) : 0;
             nextId = maxId + 1;
             editingTabId = null;
@@ -851,6 +790,12 @@ function buildMultiFilePreview(){
     if (nameLower.endsWith('.css')) { cssTags += '\n<style>\n' + file.content + '\n</style>\n'; }
     else if (nameLower.endsWith('.js')) { jsTags += '\n<script>\n' + file.content + '\n<\/script>\n'; }
   }
+
+  // إذا لم يحتوي الملف على <head> أو <body> نضيف هيكل أساسي
+  if (!/<head/i.test(htmlContent) && !/<body/i.test(htmlContent)) {
+    htmlContent = '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"></head><body>\n' + htmlContent + '\n</body></html>';
+  }
+
   var result = htmlContent;
   if (cssTags) result = result.replace(/<\/head>/i, cssTags + '</head>');
   if (jsTags) result = result.replace(/<\/body>/i, jsTags + '</body>');
