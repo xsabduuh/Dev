@@ -82,11 +82,10 @@ var previewOverlay=document.getElementById('previewOverlay');
 var previewFrame=document.getElementById('previewFrame');
 var closePreviewBtn=document.getElementById('closePreview');
 var toastEl=document.getElementById('toast');
+
+/* إخفاء نافذة التدقيق نهائياً */
 var issueOverlay=document.getElementById('issueOverlay');
-var issueBody=document.getElementById('issueBody');
-var issueCloseBtn=document.getElementById('issueClose');
-var issuePreviewRaw=document.getElementById('issuePreviewRaw');
-var issueFixAll=document.getElementById('issueFixAll');
+if(issueOverlay) issueOverlay.style.display='none';
 
 /* ═══════════ TOAST ═══════════ */
 var toastTimer=null;
@@ -94,7 +93,7 @@ function showToast(msg){
   toastEl.textContent=msg;
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer=setTimeout(function(){toastEl.classList.remove('show');},2200);
+  toastTimer=setTimeout(function(){toastEl.classList.remove('show');},3000);
 }
 
 /* ═══════════ RENDER ═══════════ */
@@ -495,288 +494,126 @@ function buildMultiFilePreview(){
   return result;
 }
 
-/* ═══════════════════════════════════════════════════
-   SMART PIPELINE — 3 phases, each runs exactly once.
-   Phases 1 & 2 are silent (never shown to user).
-   Phase 3 detects remaining issues and shows them.
-   Fix buttons (individual or Fix-All) only re-run
-   Phase 3 — they never re-trigger Phases 1 or 2.
-═══════════════════════════════════════════════════ */
+/* ═══════════ SILENT FULL PROCESSOR ═══════════ */
+function silentFullProcess(raw) {
+  var fixed = raw;
+  var fixesApplied = [];
 
-var detectedIssues = [];
-var previewContentCache = '';
-
-/* ── Phase 1: Assemble Full Page ─────────────────── */
-function assembleFullPage(raw) {
-  // Strip Markdown code fences
-  var code = raw.replace(/```[\w-]*[ \t]*\r?\n?/g, '').replace(/```/g, '');
-
-  // Detect pure CSS or pure JS (no HTML tags at all)
-  var hasTags = /<[a-zA-Z][^>]*>/.test(code);
-  var isCSS = !hasTags && /\{[^}]*:[^}]*\}/.test(code);
-  var isJS  = !hasTags && /\b(function|const|let|var|=>|console\.log|alert|document\.)\b/.test(code);
-
-  if (isCSS) {
-    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n' +
-           '<meta charset="UTF-8">\n' +
-           '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
-           '<title>Preview</title>\n' +
-           '<style>\n' + code + '\n</style>\n' +
-           '</head>\n<body>\n</body>\n</html>';
-  }
-  if (isJS) {
-    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n' +
-           '<meta charset="UTF-8">\n' +
-           '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
-           '<title>Preview</title>\n' +
-           '</head>\n<body>\n' +
-           '<script>\n' + code + '\n<\/script>\n' +
-           '</body>\n</html>';
+  // 1. Strip Markdown fences
+  if (/```/.test(fixed)) {
+    fixed = fixed.replace(/```[\w-]*\s*\n?/g, '').replace(/```/g, '');
+    fixesApplied.push('علامات Markdown');
   }
 
-  // HTML (possibly partial) — add missing structural elements
-  var result = code;
-  var hasHtmlTag   = /<html[\s>]/i.test(result);
-  var hasDoctype   = /<!DOCTYPE\s+html/i.test(result);
-
-  if (!hasHtmlTag) {
-    // Fully wrap bare snippet
-    result =
-      '<!DOCTYPE html>\n<html lang="en">\n<head>\n' +
-      '<meta charset="UTF-8">\n' +
-      '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
-      '<title>Preview</title>\n</head>\n<body>\n' +
-      result +
-      '\n</body>\n</html>';
+  // 2. Detect type and assemble full page
+  var hasTags = /<[a-zA-Z][^>]*>/.test(fixed);
+  if (!hasTags) {
+    if (/\{[^}]*:[^}]*\}/.test(fixed)) {
+      // Pure CSS
+      fixed = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n<style>\n' + fixed + '\n</style>\n</head>\n<body>\n</body>\n</html>';
+      fixesApplied.push('تغليف CSS بصفحة كاملة');
+    } else if (/\b(function|const|let|var|console\.log|alert)\b/.test(fixed)) {
+      // Pure JS
+      fixed = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n</head>\n<body>\n<script>\n' + fixed + '\n<\/script>\n</body>\n</html>';
+      fixesApplied.push('تغليف JavaScript بصفحة كاملة');
+    }
   } else {
-    if (!hasDoctype) result = '<!DOCTYPE html>\n' + result;
-    if (/<head[\s>]/i.test(result)) {
-      if (!/<meta[^>]*charset/i.test(result))
-        result = result.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">');
-      if (!/<meta[^>]*name\s*=\s*["']viewport["']/i.test(result))
-        result = result.replace(/(<head[^>]*>)/i, '$1\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
-      if (!/<title[\s>]/i.test(result))
-        result = result.replace(/<\/head>/i, '<title>Preview</title>\n</head>');
+    // HTML — ensure full structure
+    if (!/<!DOCTYPE\s+html/i.test(fixed)) {
+      fixed = '<!DOCTYPE html>\n' + fixed;
+      fixesApplied.push('DOCTYPE');
     }
-    if (!/<body[\s>]/i.test(result)) {
-      result = result.replace(/<\/head>/i, '</head>\n<body>')
-                     .replace(/<\/html>/i, '</body>\n</html>');
+    if (!/<html[\s>]/i.test(fixed)) {
+      fixed = '<html lang="en">\n' + fixed + '\n</html>';
+      fixesApplied.push('وسم html');
+    }
+    if (!/<head[\s>]/i.test(fixed)) {
+      fixed = fixed.replace(/(<html[^>]*>)/i, '$1\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n</head>');
+      fixesApplied.push('head');
+    } else {
+      if (!/<meta[^>]*charset/i.test(fixed)) { fixed = fixed.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">'); }
+      if (!/<meta[^>]*viewport/i.test(fixed)) { fixed = fixed.replace(/(<head[^>]*>)/i, '$1\n<meta name="viewport" content="width=device-width, initial-scale=1.0">'); }
+      if (!/<title/i.test(fixed)) { fixed = fixed.replace(/<\/head>/i, '<title>Preview</title>\n</head>'); }
+    }
+    if (!/<body[\s>]/i.test(fixed)) {
+      fixed = fixed.replace(/<\/head>/i, '</head>\n<body>').replace(/<\/html>/i, '</body>\n</html>');
+      fixesApplied.push('body');
+    }
+    if (!/<html[^>]*lang/i.test(fixed)) {
+      fixed = fixed.replace(/<html/i, '<html lang="en"');
+      fixesApplied.push('lang');
     }
   }
 
-  return result;
-}
+  // 3. Fix self-closing block tags
+  if (/<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*)?\/\s*>/gi.test(fixed)) {
+    fixed = fixed.replace(/<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*)?\/\s*>/gi, function(m, tag, attrs) {
+      return '<' + tag + (attrs || '') + '></' + tag + '>';
+    });
+    fixesApplied.push('وسوم ذاتية الإغلاق');
+  }
 
-/* ── Phase 2: Silent Fixes (applied once, never displayed) ── */
-function applySilentFixes(html) {
-  var fixed = html;
+  // 4. Unitless CSS values
+  if (/:\s*\d+(?![a-zA-Z%])\s*;/.test(fixed)) {
+    fixed = fixed.replace(/:\s*(\d+)(?![a-zA-Z%])\s*;/g, function(match, num) {
+      return num === '0' ? match : ': ' + num + 'px;';
+    });
+    fixesApplied.push('وحدات CSS');
+  }
 
-  // Self-closing block tags → proper open/close pairs
-  fixed = fixed.replace(
-    /<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*)?\/\s*>/gi,
-    function(m, tag, attrs) { return '<' + tag + (attrs || '') + '></' + tag + '>'; }
-  );
+  // 5. Comment out document.write
+  if (/document\.write/.test(fixed) && !/\/\/\s*document\.write/.test(fixed)) {
+    fixed = fixed.replace(/^([ \t]*)document\.write/gm, '$1// document.write');
+    fixesApplied.push('document.write (تم تعطيله)');
+  }
 
-  // Unitless numeric CSS values → add px (except 0 and numbers inside quotes/strings)
-  fixed = fixed.replace(/:\s*(\d+)(?![a-zA-Z%.\d])\s*;/g, function(match, num) {
-    return num === '0' ? match : ': ' + num + 'px;';
-  });
+  // 6. Fix missing ) before { in if/while/for
+  if (/(if|while|for)\s*\([^(){}]*\s*\{/.test(fixed)) {
+    fixed = fixed.replace(/(if|while|for)\s*\(([^(){}]+)\s*\{/g, function(m, kw, cond) {
+      return kw + '(' + cond + ') {';
+    });
+    fixesApplied.push('أقواس ناقصة في الشروط');
+  }
 
-  // Comment out document.write calls
-  fixed = fixed.replace(/^([ \t]*)document\.write\b/gm, '$1// document.write');
-
-  // Fix genuinely missing closing ) before { in if/while/for.
-  // The pattern only matches when there is NO closing ) between ( and {,
-  // so valid code like `if (x > 5) {` is left completely untouched.
-  fixed = fixed.replace(/(if|while|for)\s*\(([^(){}]+)\s*\{/g, function(m, kw, cond) {
-    return kw + '(' + cond.replace(/\s+$/, '') + ') {';
-  });
-
-  // Add console panel exactly once if console.log is used and no #console exists
+  // 7. Add console panel if console.log used
   if (/console\.log\(/.test(fixed) && !/id\s*=\s*["']console["']/.test(fixed)) {
-    var consoleDiv =
-      '<div id="console" style="position:fixed;bottom:0;left:0;right:0;height:120px;' +
-      'background:#111;color:#0f0;font-family:monospace;overflow:auto;padding:8px;' +
-      'border-top:1px solid #333;z-index:9999;"></div>';
-    var consoleScript =
-      '<script>(function(){' +
-      'var c=document.getElementById("console");if(!c)return;' +
-      'var ol=console.log;' +
-      'console.log=function(){var a=Array.prototype.slice.call(arguments);c.innerHTML+=a.join(" ")+"\\n";ol.apply(console,a);};' +
-      'window.onerror=function(m){c.innerHTML+="ERROR: "+m+"\\n";};' +
-      '})();<\/script>';
+    var consoleDiv = '<div id="console" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#111;color:#0f0;font-family:monospace;overflow:auto;padding:8px;border-top:1px solid #333;z-index:9999;"></div>';
+    var consoleScript = '<script>(function(){var c=document.getElementById("console");if(!c)return;var oldLog=console.log;console.log=function(){var args=Array.prototype.slice.call(arguments);c.innerHTML+=args.join(" ")+"\\n";oldLog.apply(console,args);};window.onerror=function(m){c.innerHTML+="ERROR: "+m+"\\n";};})();<\/script>';
     if (/<\/body>/i.test(fixed)) {
       fixed = fixed.replace(/<\/body>/i, consoleDiv + consoleScript + '</body>');
     } else {
       fixed += '\n' + consoleDiv + consoleScript;
     }
+    fixesApplied.push('نافذة Console');
   }
 
-  return fixed;
+  // 8. Fix images without alt
+  if (/<img(?!\s+[^>]*\balt\s*=)[^>]*>/i.test(fixed)) {
+    fixed = fixed.replace(/<img(?!\s+[^>]*\balt\s*=)([^>]*)>/gi, function(m, attrs) {
+      return '<img' + attrs + ' alt="">';
+    });
+    fixesApplied.push('صور بدون alt');
+  }
+
+  // 9. Fix input without type
+  if (/<input(?:\s(?!type\s*=)[^>]*|\s*>)/i.test(fixed)) {
+    fixed = fixed.replace(/<input(\s(?!type\s*=)[^>]*|>)/gi, function(m, rest) {
+      return '<input type="text"' + rest;
+    });
+    fixesApplied.push('input بدون type');
+  }
+
+  // 10. Replace obsolete tags
+  if (/<(center|font|marquee)[\s>]/i.test(fixed)) {
+    fixed = fixed.replace(/<center(\s[^>]*)?>/gi, '<div style="text-align:center"$1>').replace(/<\/center>/gi, '</div>');
+    fixed = fixed.replace(/<font(\s[^>]*)?>/gi, '<span$1>').replace(/<\/font>/gi, '</span>');
+    fixed = fixed.replace(/<marquee(\s[^>]*)?>/gi, '<div$1>').replace(/<\/marquee>/gi, '</div>');
+    fixesApplied.push('وسوم قديمة');
+  }
+
+  return { cleanCode: fixed, fixes: fixesApplied };
 }
 
-/* ── Phase 3: Detect Remaining Issues ───────────── */
-function detectRemainingIssues(html) {
-  var issues = [];
-
-  // Duplicate structural tags
-  ['html', 'head', 'body'].forEach(function(tag) {
-    var count = (html.match(new RegExp('<' + tag + '[\\s>]', 'gi')) || []).length;
-    if (count > 1)
-      issues.push({ type: 'duplicate-' + tag, message: 'يوجد أكثر من وسم <' + tag + '>.', fix: null });
-  });
-
-  // Mismatched open/close tag counts (excluding void elements and self-closing syntax)
-  var voidSet = { br:1,hr:1,img:1,input:1,meta:1,link:1,area:1,base:1,col:1,embed:1,source:1,track:1,wbr:1 };
-  var tagRegex = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g;
-  var tagCounts = {}, m;
-  while ((m = tagRegex.exec(html)) !== null) {
-    var tn = m[2].toLowerCase();
-    if (voidSet[tn]) continue;
-    if (/\/\s*>$/.test(m[0]) && m[1] !== '/') continue;
-    if (!tagCounts[tn]) tagCounts[tn] = { open: 0, close: 0 };
-    if (m[1] === '/') tagCounts[tn].close++; else tagCounts[tn].open++;
-  }
-  var mismatched = [];
-  for (var t in tagCounts) {
-    if (tagCounts[t].open !== tagCounts[t].close)
-      mismatched.push(t + ' (' + tagCounts[t].open + '/' + tagCounts[t].close + ')');
-  }
-  if (mismatched.length)
-    issues.push({ type: 'tag-mismatch', message: 'وسوم غير متطابقة: ' + mismatched.join(', '), fix: null });
-
-  // Duplicate id attributes
-  var idMatches = html.match(/\bid\s*=\s*["']([^"']+)["']/gi) || [];
-  var idNames = idMatches.map(function(x) { return x.replace(/\bid\s*=\s*["']/i,'').replace(/["']/g,''); });
-  var idSeen = {}, dupIds = [];
-  idNames.forEach(function(id) {
-    if (idSeen[id]) { if (dupIds.indexOf(id) === -1) dupIds.push(id); }
-    else idSeen[id] = true;
-  });
-  if (dupIds.length)
-    issues.push({ type: 'duplicate-id', message: 'معرفات id مكررة: ' + dupIds.slice(0,3).join(', '), fix: null });
-
-  // Images without alt attribute
-  var imgs = html.match(/<img[^>]*>/gi) || [];
-  var noAlt = imgs.filter(function(img) { return !/\balt\s*=/i.test(img); });
-  if (noAlt.length) {
-    issues.push({
-      type: 'img-no-alt',
-      message: 'عدد ' + noAlt.length + ' صورة بدون سمة alt.',
-      fix: function(h) {
-        return h.replace(/<img([^>]*)>/gi, function(full, attrs) {
-          if (/\balt\s*=/i.test(attrs)) return full;
-          return '<img' + attrs + ' alt="">';
-        });
-      }
-    });
-  }
-
-  // Obsolete tags: center, font, marquee
-  var obsolete = html.match(/<(center|font|marquee)[\s>]/gi);
-  if (obsolete) {
-    var uniqueObs = obsolete.filter(function(v,i,a){ return a.indexOf(v)===i; });
-    issues.push({
-      type: 'obsolete-tags',
-      message: 'وسوم قديمة: ' + uniqueObs.join(', '),
-      fix: function(h) {
-        h = h.replace(/<center(\s[^>]*)?>/gi, '<div style="text-align:center"$1>').replace(/<\/center>/gi, '</div>');
-        h = h.replace(/<font(\s[^>]*)?>/gi, '<span$1>').replace(/<\/font>/gi, '</span>');
-        h = h.replace(/<marquee(\s[^>]*)?>/gi, '<div$1>').replace(/<\/marquee>/gi, '</div>');
-        return h;
-      }
-    });
-  }
-
-  // Input elements without a type attribute
-  // Uses negative lookahead so inputs that already have type= are never touched
-  if (/<input(?:\s(?!type\s*=)[^>]*|\s*>)/i.test(html)) {
-    issues.push({
-      type: 'input-no-type',
-      message: 'عناصر input بدون type.',
-      fix: function(h) {
-        // Only insert type="text" when the input tag has no type= attribute
-        return h.replace(/<input(\s(?!type\s*=)[^>]*|>)/gi, function(full, rest) {
-          return '<input type="text"' + rest;
-        });
-      }
-    });
-  }
-
-  // @import over http (warning only)
-  if (/@import\s+(?:url\(["']?)?http:/.test(html))
-    issues.push({ type: 'css-import-http', message: 'يوجد @import برابط http.', fix: null });
-
-  // <script src="http:..."> (warning only)
-  if (/<script[^>]+src\s*=\s*["']http:/.test(html))
-    issues.push({ type: 'script-src-http', message: 'سكريبت خارجي برابط http.', fix: null });
-
-  // JavaScript bracket balance (warnings only)
-  var scriptBlocks = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
-  var jsCode = scriptBlocks.join('');
-  function countOccurrences(str, ch) { return str.split(ch).length - 1; }
-  if (countOccurrences(jsCode, '{') !== countOccurrences(jsCode, '}'))
-    issues.push({ type: 'js-brace-mismatch',   message: 'الأقواس { } غير متطابقة في JavaScript.', fix: null });
-  if (countOccurrences(jsCode, '[') !== countOccurrences(jsCode, ']'))
-    issues.push({ type: 'js-bracket-mismatch', message: 'الأقواس [ ] غير متطابقة في JavaScript.', fix: null });
-  if (countOccurrences(jsCode, '(') !== countOccurrences(jsCode, ')'))
-    issues.push({ type: 'js-paren-mismatch',   message: 'الأقواس ( ) غير متطابقة في JavaScript.', fix: null });
-
-  // Security warnings
-  if (/\beval\s*\(/.test(html))
-    issues.push({ type: 'eval',       message: 'استخدام eval() خطر أمنياً.', fix: null });
-  if (/\.innerHTML\s*=/.test(html))
-    issues.push({ type: 'innerHTML',  message: 'استخدام innerHTML قد يسبب XSS.', fix: null });
-
-  return issues;
-}
-
-/* ── Render Issue Modal ───────────────────────────── */
-function renderIssueModal(issues) {
-  var hasFixable = issues.some(function(iss) { return !!iss.fix; });
-
-  if (!issues.length) {
-    issueBody.innerHTML = '<div class="issue-empty">✅ لا توجد مشاكل، الكود جاهز للمعاينة.</div>';
-    issueFixAll.style.display = 'none';
-    issuePreviewRaw.style.display = 'none';
-    setTimeout(function() {
-      issueOverlay.classList.remove('show');
-      openPreviewWithContent(previewContentCache);
-    }, 400);
-    return;
-  }
-
-  var html = '';
-  for (var i = 0; i < issues.length; i++) {
-    var iss = issues[i];
-    html += '<div class="issue-item">';
-    html += '<span class="issue-icon">⚠️</span>';
-    html += '<span class="issue-text">' + iss.message + '</span>';
-    if (iss.fix) {
-      html += '<button class="issue-fix-btn" data-issue-idx="' + i + '">إصلاح</button>';
-    } else {
-      html += '<span style="color: var(--fg3); font-size:11px;">يدوي</span>';
-    }
-    html += '</div>';
-  }
-  issueBody.innerHTML = html;
-  issueFixAll.style.display = hasFixable ? 'inline-block' : 'none';
-  issuePreviewRaw.style.display = 'inline-block';
-
-  // Individual fix buttons — apply only that one fix, then re-detect (no phases 1/2)
-  issueBody.querySelectorAll('.issue-fix-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      var idx = parseInt(this.getAttribute('data-issue-idx'), 10);
-      var issue = detectedIssues[idx];
-      if (!issue || !issue.fix) return;
-      previewContentCache = issue.fix(previewContentCache);
-      detectedIssues = detectRemainingIssues(previewContentCache);
-      renderIssueModal(detectedIssues);
-    });
-  });
-}
-
-/* ── Preview helpers ─────────────────────────────── */
 function openPreviewWithContent(content) {
   previewFrame.srcdoc = content;
   previewOverlay.classList.add('show');
@@ -801,60 +638,23 @@ previewOverlay.addEventListener('click', function(e) {
   if (e.target === previewOverlay) closePreviewFn();
 });
 
-/* ── Play button: runs the full 3-phase pipeline once ── */
+/* ═══════════ PLAY BUTTON ═══════════ */
 function handlePlayClick() {
-  var combined  = buildMultiFilePreview();
-  var assembled = assembleFullPage(combined);   // Phase 1 — silent
-  var fixed     = applySilentFixes(assembled);  // Phase 2 — silent
-  previewContentCache = fixed;
-  detectedIssues = detectRemainingIssues(fixed); // Phase 3 — user-visible
-  if (detectedIssues.length === 0) {
-    openPreviewWithContent(fixed);
-  } else {
-    renderIssueModal(detectedIssues);
-    issueOverlay.classList.add('show');
+  var combined = buildMultiFilePreview();
+  var result = silentFullProcess(combined);
+  
+  if (result.fixes.length > 0) {
+    showToast('✅ تم الإصلاح: ' + result.fixes.join('، '));
   }
+  
+  // فتح المعاينة مباشرة بالكود النظيف
+  openPreviewWithContent(result.cleanCode);
 }
 playBtn.addEventListener('click', handlePlayClick);
-
-issueCloseBtn.addEventListener('click', function() {
-  issueOverlay.classList.remove('show');
-});
-
-issuePreviewRaw.addEventListener('click', function() {
-  issueOverlay.classList.remove('show');
-  openPreviewWithContent(previewContentCache);
-});
-
-// Fix All: apply every fixable issue in one pass, then re-detect once (phases 1/2 never re-run)
-issueFixAll.addEventListener('click', function() {
-  var snapshot = previewContentCache;
-  for (var i = 0; i < detectedIssues.length; i++) {
-    if (detectedIssues[i].fix) {
-      snapshot = detectedIssues[i].fix(snapshot);
-    }
-  }
-  previewContentCache = snapshot;
-  detectedIssues = detectRemainingIssues(previewContentCache);
-  if (detectedIssues.length === 0) {
-    issueOverlay.classList.remove('show');
-    openPreviewWithContent(previewContentCache);
-  } else {
-    renderIssueModal(detectedIssues);
-  }
-});
-
-issueOverlay.addEventListener('click', function(e) {
-  if (e.target === issueOverlay) issueOverlay.classList.remove('show');
-});
 
 /* ═══════════ ESCAPE KEY HANDLING ═══════════ */
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
-    if(issueOverlay.classList.contains('show')){
-      issueOverlay.classList.remove('show');
-      return;
-    }
     if(savesPanel.classList.contains('show')){
       savesPanel.classList.remove('show');
       return;
