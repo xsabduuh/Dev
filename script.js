@@ -495,25 +495,51 @@ function buildMultiFilePreview(){
   return result;
 }
 
-/* ═══════════ ISSUE DETECTION & FIX (FIXED VERSION) ═══════════ */
+/* ═══════════ ISSUE DETECTION & FIX (NEW SYSTEM) ═══════════ */
 var detectedIssues = [];
 var previewContentCache = '';
 
-function detectIssues(html) {
-  var issues = [];
-  var cleaned = html;
-  var hasTags = /<[a-zA-Z][^>]*>/.test(cleaned);
-
-  // ========== 1. Markdown ==========
-  if (/```/.test(cleaned)) {
-    issues.push({
-      type: 'markdown',
-      message: 'يحتوي على علامات Markdown (```) قد تمنع العرض.',
-      fix: function(h) { return h.replace(/```[\w-]*\s*\n?/g, '').replace(/```/g, ''); }
-    });
+// ========== PHASE 1: Silent Auto-Fixes ==========
+function applySilentAutoFixes(html) {
+  var fixed = html;
+  
+  // Remove Markdown fences
+  fixed = fixed.replace(/```[\w-]*\s*\n?/g, '').replace(/```/g, '');
+  
+  // Fix self-closing block tags: <div/> -> <div></div>
+  fixed = fixed.replace(/<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*?)\/\s*>/gi, '<$1$2></$1>');
+  
+  // Add px to unitless CSS values (except 0)
+  fixed = fixed.replace(/:\s*(\d+)(?![a-zA-Z%])\s*;/g, function(match, num) {
+    return num === '0' ? match : ': ' + num + 'px;';
+  });
+  
+  // Comment out document.write
+  fixed = fixed.replace(/^([ \t]*)document\.write/gm, '$1// document.write');
+  
+  // Fix missing ) before { in if statements
+  fixed = fixed.replace(/(if\s*\([^{]*?) \{/g, '$1) {');
+  
+  // Add console div if console.log exists and no console div present
+  if (/console\.log\(/.test(fixed) && !/id\s*=\s*["']console["']/.test(fixed)) {
+    var consoleDiv = '<div id="console" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#111;color:#0f0;font-family:monospace;overflow:auto;padding:8px;border-top:1px solid #333;z-index:9999;"></div>';
+    var script = '<script>(function(){var c=document.getElementById("console");if(!c)return;var oldLog=console.log;console.log=function(){var args=Array.prototype.slice.call(arguments);c.innerHTML+=args.join(" ")+"\\n";oldLog.apply(console,args);};window.onerror=function(m,s,l,cl,er){c.innerHTML+="ERROR: "+m+"\\n";};})();<\/script>';
+    if (/<\/body>/i.test(fixed)) {
+      fixed = fixed.replace(/<\/body>/i, consoleDiv + script + '</body>');
+    } else {
+      fixed = fixed + consoleDiv + script;
+    }
   }
+  
+  return fixed;
+}
 
-  // ========== 2. DOCTYPE ==========
+// ========== PHASE 2: Detect remaining issues ==========
+function detectRemainingIssues(cleaned) {
+  var issues = [];
+  var hasTags = /<[a-zA-Z][^>]*>/.test(cleaned);
+  
+  // 1. Missing DOCTYPE
   if (!/<!DOCTYPE\s+html/i.test(cleaned)) {
     issues.push({
       type: 'no-doctype',
@@ -521,8 +547,8 @@ function detectIssues(html) {
       fix: function(h) { return '<!DOCTYPE html>\n' + h; }
     });
   }
-
-  // ========== 3. No <html> ==========
+  
+  // 2. Missing <html>
   if (!/<html[\s>]/i.test(cleaned)) {
     issues.push({
       type: 'no-html-tag',
@@ -530,8 +556,8 @@ function detectIssues(html) {
       fix: function(h) { return '<!DOCTYPE html>\n<html>\n' + h + '\n</html>'; }
     });
   }
-
-  // ========== 4. Missing <head> & <body> ==========
+  
+  // 3. Missing <head> and <body> but has other tags
   if (hasTags && !/<head[\s>]/i.test(cleaned) && !/<body[\s>]/i.test(cleaned)) {
     issues.push({
       type: 'no-head-body',
@@ -542,8 +568,8 @@ function detectIssues(html) {
       }
     });
   }
-
-  // ========== 5. Duplicate structural tags ==========
+  
+  // 4. Duplicate structural tags
   var countTag = function(tag, h) {
     return (h.match(new RegExp('<' + tag + '[\\s>]', 'gi')) || []).length;
   };
@@ -556,46 +582,40 @@ function detectIssues(html) {
       });
     }
   });
-
-  // ========== 6. Missing charset ==========
+  
+  // 5. Missing charset
   if (hasTags && /<head/i.test(cleaned) && !/<meta[^>]*charset/i.test(cleaned)) {
     issues.push({
       type: 'no-charset',
       message: 'لا يوجد <meta charset="UTF-8">. قد تظهر الرموز مشوهة.',
-      fix: function(h) {
-        return h.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">');
-      }
+      fix: function(h) { return h.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">'); }
     });
   }
-
-  // ========== 7. Missing viewport ==========
+  
+  // 6. Missing viewport
   if (hasTags && /<head/i.test(cleaned) && !/<meta[^>]*name\s*=\s*["']viewport["'][^>]*>/i.test(cleaned)) {
     issues.push({
       type: 'no-viewport',
       message: 'لا يوجد <meta viewport>. التصميم لن يتجاوب على الجوال.',
-      fix: function(h) {
-        return h.replace(/(<head[^>]*>)/i, '$1\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
-      }
+      fix: function(h) { return h.replace(/(<head[^>]*>)/i, '$1\n<meta name="viewport" content="width=device-width, initial-scale=1.0">'); }
     });
   }
-
-  // ========== 8. Missing <title> ==========
+  
+  // 7. Missing title
   if (hasTags && /<head/i.test(cleaned) && !/<title[^>]*>/i.test(cleaned)) {
     issues.push({
       type: 'no-title',
       message: 'لا يوجد وسم <title> في الرأس.',
-      fix: function(h) {
-        return h.replace(/<\/head>/i, '<title>Preview</title>\n</head>');
-      }
+      fix: function(h) { return h.replace(/<\/head>/i, '<title>Preview</title>\n</head>'); }
     });
   }
-
-  // ========== 9. Multiple <title> ==========
+  
+  // 8. Multiple title
   if ((cleaned.match(/<title[^>]*>/gi) || []).length > 1) {
     issues.push({ type: 'multi-title', message: 'يوجد أكثر من وسم <title>.', fix: null });
   }
-
-  // ========== 10. Pure CSS ==========
+  
+  // 9. Pure CSS
   if (!hasTags && /[{;]\s*\n?\s*[a-zA-Z-]+\s*:/.test(cleaned)) {
     issues.push({
       type: 'pure-css',
@@ -605,8 +625,19 @@ function detectIssues(html) {
       }
     });
   }
-
-  // ========== 11. CSS outside <style> ==========
+  
+  // 10. Pure JS
+  if (!hasTags && /\b(function|const|let|var|=>|console\.log|alert|document\.)\b/.test(cleaned)) {
+    issues.push({
+      type: 'pure-js',
+      message: 'يبدو أنه كود JavaScript خالص. سيتم تغليفه بصفحة.',
+      fix: function(h) {
+        return '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>\n<script>\n' + h + '\n<\/script></body></html>';
+      }
+    });
+  }
+  
+  // 11. CSS outside <style> (inside HTML)
   if (hasTags && /\b[a-zA-Z-]+\s*:\s*[^;]+;/.test(cleaned) && !/<style[^>]*>/i.test(cleaned)) {
     issues.push({
       type: 'css-outside-style',
@@ -621,43 +652,8 @@ function detectIssues(html) {
       }
     });
   }
-
-  // ========== 12. CSS missing units (FIXED) ==========
-  var unitless = cleaned.match(/:\s*\d+(?![a-zA-Z%])\s*;/g);
-  if (unitless && unitless.length) {
-    issues.push({
-      type: 'css-no-unit',
-      message: 'قيم CSS بدون وحدة (مثل width:100;) تم إضافة px افتراضياً.',
-      fix: function(h) {
-        return h.replace(/:\s*(\d+)(?![a-zA-Z%])\s*;/g, function(match, num) {
-          return num === '0' ? match : ': ' + num + 'px;';
-        });
-      }
-    });
-  }
-
-  // ========== 13. @import HTTP ==========
-  if (/@import\s+url\(["']?http:/.test(cleaned)) {
-    issues.push({ type: 'css-import-http', message: 'يوجد @import برابط http قد يُمنع.', fix: null });
-  }
-
-  // ========== 14. Empty <style> ==========
-  if (/<style[^>]*>\s*<\/style>/gi.test(cleaned)) {
-    issues.push({ type: 'empty-style', message: 'هناك وسم <style> فارغ.', fix: null });
-  }
-
-  // ========== 15. Pure JS ==========
-  if (!hasTags && /\b(function|const|let|var|=>|console\.log|alert|document\.)\b/.test(cleaned)) {
-    issues.push({
-      type: 'pure-js',
-      message: 'يبدو أنه كود JavaScript خالص. سيتم تغليفه بصفحة.',
-      fix: function(h) {
-        return '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>\n<script>\n' + h + '\n<\/script></body></html>';
-      }
-    });
-  }
-
-  // ========== 16. JS outside <script> ==========
+  
+  // 12. JS outside <script> (inside HTML)
   if (hasTags && /\b(function|const|let|var|=>|console\.log)\b/.test(cleaned) && !/<script[^>]*>/i.test(cleaned)) {
     issues.push({
       type: 'js-outside-script',
@@ -673,71 +669,8 @@ function detectIssues(html) {
       }
     });
   }
-
-  // ========== 17. Script src http ==========
-  if (/<script[^>]+src\s*=\s*["']http:/.test(cleaned)) {
-    issues.push({ type: 'script-src-http', message: 'سكريبت خارجي من رابط http قد يمنع.', fix: null });
-  }
-
-  // ========== 18. document.write (FIXED) ==========
-  if (/^[ \t]*document\.write\s*\(/m.test(cleaned)) {
-    issues.push({
-      type: 'document-write',
-      message: 'استخدام document.write قد يفشل. سيتم تعطيله (تعليقه).',
-      fix: function(h) {
-        return h.replace(/^([ \t]*)document\.write/gm, '$1// document.write');
-      }
-    });
-  }
-
-  // ========== 19. Bracket mismatch (AUTO-FIX for if) ==========
-  var jsCode = '';
-  var scriptMatches = cleaned.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
-  if (scriptMatches) {
-    jsCode = scriptMatches.join('');
-  } else if (!hasTags) {
-    jsCode = cleaned;
-  }
-  var countChar = function(code, ch) { return (code.match(new RegExp('\\' + ch, 'g')) || []).length; };
-  var parenMismatch = countChar(jsCode, '(') !== countChar(jsCode, ')');
-  if (parenMismatch) {
-    if (/if\s*\([^{]*\{/.test(jsCode)) {
-      issues.push({
-        type: 'js-paren-mismatch',
-        message: 'الأقواس ( ) غير متطابقة (مفقود ) قبل {). سيتم الإصلاح.',
-        fix: function(h) {
-          return h.replace(/(if\s*\([^{]*) \{/g, '$1) {');
-        }
-      });
-    } else {
-      issues.push({ type: 'js-paren-mismatch', message: 'الأقواس ( ) غير متطابقة في JavaScript.', fix: null });
-    }
-  }
-  if (countChar(jsCode, '{') !== countChar(jsCode, '}')) {
-    issues.push({ type: 'js-brace-mismatch', message: 'الأقواس { } غير متطابقة في JavaScript.', fix: null });
-  }
-  if (countChar(jsCode, '[') !== countChar(jsCode, ']')) {
-    issues.push({ type: 'js-bracket-mismatch', message: 'الأقواس [ ] غير متطابقة في JavaScript.', fix: null });
-  }
-
-  // ========== 20. console.log (FIXED) ==========
-  if (/console\.log\(/.test(cleaned) && !/id\s*=\s*["']console["']/.test(cleaned)) {
-    issues.push({
-      type: 'console-log',
-      message: 'الكود يستخدم console.log، سيتم إضافة نافذة Console للمعاينة.',
-      fix: function(h) {
-        var consoleDiv = '<div id="console" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#111;color:#0f0;font-family:monospace;overflow:auto;padding:8px;border-top:1px solid #333;z-index:9999;"></div>';
-        var script = '<script>(function(){var c=document.getElementById("console");if(!c)return;var oldLog=console.log;console.log=function(){var args=Array.prototype.slice.call(arguments);c.innerHTML+=args.join(" ")+"\\n";oldLog.apply(console,args);};window.onerror=function(m,s,l,cl,er){c.innerHTML+="ERROR: "+m+"\\n";};})();<\/script>';
-        if (/<\/body>/i.test(h)) {
-          return h.replace(/<\/body>/i, consoleDiv + script + '</body>');
-        } else {
-          return h + consoleDiv + script;
-        }
-      }
-    });
-  }
-
-  // ========== 21. Mismatched HTML tags (FIXED counter) ==========
+  
+  // 13. Mismatched HTML tags
   var voidElements = ['br','hr','img','input','meta','link','area','base','col','embed','source','track','wbr'];
   var tagRegex = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g;
   var tagCounts = {};
@@ -747,7 +680,6 @@ function detectIssues(html) {
     var isClosing = match[1] === '/';
     if (voidElements.indexOf(tagName) !== -1) continue;
     var fullTag = match[0];
-    // If self-closing block tag (e.g., <div />) skip counting entirely
     if (/\/\s*>$/.test(fullTag) && !isClosing) continue;
     if (!tagCounts[tagName]) tagCounts[tagName] = { open: 0, close: 0 };
     if (isClosing) tagCounts[tagName].close++;
@@ -766,19 +698,8 @@ function detectIssues(html) {
       fix: null
     });
   }
-
-  // ========== 22. Self-closing block tags (FIXED) ==========
-  if (/<(div|span|p|section|article|nav|header|footer|main|aside)\s[^>]*\/\s*>/gi.test(cleaned)) {
-    issues.push({
-      type: 'self-closing-block',
-      message: 'وسوم بلوك ذاتية الإغلاق (مثل <div/>) ستصحح إلى <div></div>.',
-      fix: function(h) {
-        return h.replace(/<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*?)\/\s*>/gi, '<$1$2></$1>');
-      }
-    });
-  }
-
-  // ========== 23. Duplicate IDs ==========
+  
+  // 14. Duplicate IDs
   var ids = cleaned.match(/id\s*=\s*["']([^"']+)["']/gi) || [];
   var idNames = ids.map(function(x) { return x.replace(/id\s*=\s*["']/i, '').replace(/["']/g, ''); });
   var duplicates = idNames.filter(function(id, idx) { return idNames.indexOf(id) !== idx; });
@@ -789,8 +710,8 @@ function detectIssues(html) {
       fix: null
     });
   }
-
-  // ========== 24. Img without alt ==========
+  
+  // 15. Img without alt
   var imgs = cleaned.match(/<img[^>]*>/gi) || [];
   var noAlt = imgs.filter(function(img) { return !/alt\s*=/i.test(img); });
   if (noAlt.length) {
@@ -805,8 +726,8 @@ function detectIssues(html) {
       }
     });
   }
-
-  // ========== 25. Obsolete tags ==========
+  
+  // 16. Obsolete tags
   var obsolete = cleaned.match(/<(center|font|marquee)[\s>]/gi);
   if (obsolete) {
     issues.push({
@@ -820,17 +741,17 @@ function detectIssues(html) {
       }
     });
   }
-
-  // ========== 26. Missing lang ==========
+  
+  // 17. Missing lang
   if (/<html/i.test(cleaned) && !/<html[^>]*\slang\s*=/i.test(cleaned)) {
     issues.push({
       type: 'no-lang',
-      message: 'وسم <html> بدون سمة lang. ستضاف lang="en" (يمكنك تغييرها يدوياً).',
+      message: 'وسم <html> بدون سمة lang. ستضاف lang="en".',
       fix: function(h) { return h.replace(/<html/i, '<html lang="en"'); }
     });
   }
-
-  // ========== 27. Inputs without type ==========
+  
+  // 18. Input without type
   if (/<input\s(?!type)/i.test(cleaned) || /<input\s*>/i.test(cleaned)) {
     issues.push({
       type: 'input-no-type',
@@ -841,10 +762,40 @@ function detectIssues(html) {
       }
     });
   }
-
+  
+  // 19. @import with http
+  if (/@import\s+url\(["']?http:/.test(cleaned)) {
+    issues.push({ type: 'css-import-http', message: 'يوجد @import برابط http قد يُمنع.', fix: null });
+  }
+  
+  // 20. Script src http
+  if (/<script[^>]+src\s*=\s*["']http:/.test(cleaned)) {
+    issues.push({ type: 'script-src-http', message: 'سكريبت خارجي من رابط http قد يمنع.', fix: null });
+  }
+  
+  // 21. Bracket mismatch in JS (report only what remains)
+  var jsCode = '';
+  var scriptMatches = cleaned.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
+  if (scriptMatches) {
+    jsCode = scriptMatches.join('');
+  } else if (!hasTags) {
+    jsCode = cleaned;
+  }
+  var countChar = function(code, ch) { return (code.match(new RegExp('\\' + ch, 'g')) || []).length; };
+  if (countChar(jsCode, '{') !== countChar(jsCode, '}')) {
+    issues.push({ type: 'js-brace-mismatch', message: 'الأقواس { } غير متطابقة في JavaScript.', fix: null });
+  }
+  if (countChar(jsCode, '[') !== countChar(jsCode, ']')) {
+    issues.push({ type: 'js-bracket-mismatch', message: 'الأقواس [ ] غير متطابقة في JavaScript.', fix: null });
+  }
+  if (countChar(jsCode, '(') !== countChar(jsCode, ')')) {
+    issues.push({ type: 'js-paren-mismatch', message: 'الأقواس ( ) غير متطابقة في JavaScript.', fix: null });
+  }
+  
   return issues;
 }
 
+// ========== PHASE 3: Render modal and handle actions ==========
 function renderIssueModal(issues, previewContent) {
   if (!issues.length) {
     issueBody.innerHTML = '<div class="issue-empty">✅ لا توجد مشاكل، الكود جاهز للمعاينة.</div>';
@@ -879,7 +830,7 @@ function renderIssueModal(issues, previewContent) {
         var issue = detectedIssues[idx];
         if (issue && issue.fix) {
           previewContentCache = issue.fix(previewContentCache);
-          detectedIssues = detectIssues(previewContentCache);
+          detectedIssues = detectRemainingIssues(previewContentCache);
           renderIssueModal(detectedIssues, previewContentCache);
         }
       });
@@ -897,7 +848,6 @@ function closePreviewFn() {
   previewFrame.srcdoc = '';
 }
 
-// Fix close button for touch/mouse
 closePreviewBtn.addEventListener('click', function(e) {
   e.stopPropagation();
   closePreviewFn();
@@ -908,22 +858,25 @@ closePreviewBtn.addEventListener('touchend', function(e) {
   closePreviewFn();
 });
 
-// Close preview on background click
 previewOverlay.addEventListener('click', function(e) {
   if (e.target === previewOverlay) {
     closePreviewFn();
   }
 });
 
+/* ═══════════ MAIN FLOW ═══════════ */
 function handlePlayClick() {
   var combined = buildMultiFilePreview();
-  previewContentCache = combined;
-  detectedIssues = detectIssues(combined);
-
+  // Phase 1: Silent auto-fixes
+  var autoFixed = applySilentAutoFixes(combined);
+  previewContentCache = autoFixed;
+  // Phase 2: Detect issues on cleaned code
+  detectedIssues = detectRemainingIssues(autoFixed);
+  // Phase 3: Show modal if issues remain
   if (detectedIssues.length === 0) {
-    openPreviewWithContent(combined);
+    openPreviewWithContent(autoFixed);
   } else {
-    renderIssueModal(detectedIssues, combined);
+    renderIssueModal(detectedIssues, autoFixed);
     issueOverlay.classList.add('show');
   }
 }
@@ -942,7 +895,7 @@ issueFixAll.addEventListener('click', function() {
       previewContentCache = detectedIssues[i].fix(previewContentCache);
     }
   }
-  detectedIssues = detectIssues(previewContentCache);
+  detectedIssues = detectRemainingIssues(previewContentCache);
   if (detectedIssues.length === 0) {
     issueOverlay.classList.remove('show');
     openPreviewWithContent(previewContentCache);
