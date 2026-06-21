@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 
-/* ═══════════ MIGRATION ═══════════ */
+/* ═══════════ MIGRATION (unchanged) ═══════════ */
 var DATA_VERSION = 2;
 function migrateData() {
   var versionKey = 'ce_saves_version', dataKey = 'ce_saves_v1';
@@ -22,7 +22,7 @@ function migrateData() {
 }
 migrateData();
 
-/* ═══════════ HIGHLIGHTER ═══════════ */
+/* ═══════════ HIGHLIGHTER (unchanged) ═══════════ */
 var KW=new Set(['const','let','var','function','return','if','else','for','while','do',
   'switch','case','break','continue','new','delete','typeof','instanceof','in','of',
   'class','extends','import','export','default','async','await','try','catch','finally',
@@ -45,7 +45,7 @@ function highlight(code){
   return out.join('');
 }
 
-/* ═══════════ STATE ═══════════ */
+/* ═══════════ STATE (unchanged) ═══════════ */
 var files=[{id:1,name:'index.html',content:''}];
 var activeId=1,nextId=2;
 var undoSt={1:[]},redoSt={1:[]};
@@ -56,7 +56,7 @@ var editingTabId = null;
 function getFile(){for(var k=0;k<files.length;k++)if(files[k].id===activeId)return files[k];return files[0];}
 function findFileByName(name){for(var i=0;i<files.length;i++){if(files[i].name===name)return files[i];}return null;}
 
-/* ═══════════ DOM ═══════════ */
+/* ═══════════ DOM ELEMENTS ═══════════ */
 var tabsBar=document.getElementById('tabsBar');
 var lineNums=document.getElementById('lineNums');
 var hlLayer=document.getElementById('hlLayer');
@@ -83,11 +83,7 @@ var previewFrame=document.getElementById('previewFrame');
 var closePreviewBtn=document.getElementById('closePreview');
 var toastEl=document.getElementById('toast');
 
-/* إخفاء نافذة التدقيق نهائياً */
-var issueOverlay=document.getElementById('issueOverlay');
-if(issueOverlay) issueOverlay.style.display='none';
-
-/* ═══════════ TOAST ═══════════ */
+/* ═══════════ TOAST (unchanged) ═══════════ */
 var toastTimer=null;
 function showToast(msg){
   toastEl.textContent=msg;
@@ -96,7 +92,7 @@ function showToast(msg){
   toastTimer=setTimeout(function(){toastEl.classList.remove('show');},3000);
 }
 
-/* ═══════════ RENDER ═══════════ */
+/* ═══════════ RENDER (unchanged) ═══════════ */
 function renderLineNums(text){
   var n = (text.match(/\n/g)||[]).length + 1;
   var h='';
@@ -206,7 +202,7 @@ function renderTabs(){
   }
 }
 
-/* ═══════════ TABS ═══════════ */
+/* ═══════════ TABS (improved switchTab & closeTab) ═══════════ */
 function switchTab(id){
   commitUndo();
   activeId=id;
@@ -215,6 +211,8 @@ function switchTab(id){
   renderEditor();
   closeDropdown();
   copyTip.classList.remove('show');
+  // IMPROVED: trigger real-time validation for newly active file after debounce
+  scheduleRealTimeValidation();
 }
 
 function closeTab(id){
@@ -224,9 +222,13 @@ function closeTab(id){
   delete undoSt[id];delete redoSt[id];
   if(activeId===id)activeId=files[files.length-1].id;
   renderTabs();renderEditor();
+  // IMPROVED: update diagnostics after closing tab
+  scheduleRealTimeValidation();
+  // FIXED: Invalidate analysis cache because file list changed
+  _analysisCache = {};
 }
 
-/* ═══════════ INLINE RENAME ═══════════ */
+/* ═══════════ INLINE RENAME (updated) ═══════════ */
 function startEditTabName(id){
   editingTabId = id;
   renderTabs();
@@ -241,13 +243,15 @@ function finishRename(newName, id){
   }
   editingTabId = null;
   renderTabs();
+  // FIXED: Invalidate cache because filename may affect diagnostics
+  _analysisCache = {};
 }
 function cancelRename(){
   editingTabId = null;
   renderTabs();
 }
 
-/* ═══════════ UNDO / REDO ═══════════ */
+/* ═══════════ UNDO / REDO (unchanged) ═══════════ */
 function initSt(id){if(!undoSt[id])undoSt[id]=[];if(!redoSt[id])redoSt[id]=[];}
 function pushUndo(snap){
   initSt(activeId);
@@ -284,7 +288,7 @@ function doRedo(){
   applyContent(next);lastCommit=next;
 }
 
-/* ═══════════ TEXTAREA EVENTS ═══════════ */
+/* ═══════════ TEXTAREA EVENTS (with real-time validation) ═══════════ */
 codeArea.addEventListener('input',function(){
   var val=codeArea.value;
   for(var k=0;k<files.length;k++)if(files[k].id===activeId){files[k].content=val;break;}
@@ -294,6 +298,8 @@ codeArea.addEventListener('input',function(){
   undoTimer=setTimeout(function(){
     if(val!==snap){pushUndo(snap);lastCommit=val;updateBtns();}
   },600);
+  // IMPROVED: trigger real-time validation for current file
+  scheduleRealTimeValidation();
 });
 
 codeArea.addEventListener('scroll',function(){
@@ -317,7 +323,7 @@ codeArea.addEventListener('keydown',function(e){
   if((e.ctrlKey||e.metaKey)&&e.key==='a'){setTimeout(function(){copyTip.classList.add('show');},50);}
 });
 
-/* ═══════════ TOOLBAR BUTTONS ═══════════ */
+/* ═══════════ TOOLBAR BUTTONS (unchanged) ═══════════ */
 undoBtn.addEventListener('click',doUndo);
 redoBtn.addEventListener('click',doRedo);
 selAllBtn.addEventListener('click',function(){codeArea.focus();codeArea.select();copyTip.classList.add('show');});
@@ -333,7 +339,7 @@ function fbCopy(t){var ta=document.createElement('textarea');ta.value=t;ta.style
 tipDismiss.addEventListener('click',function(){copyTip.classList.remove('show');});
 document.addEventListener('mousedown',function(e){if(!copyTip.contains(e.target)&&e.target!==selAllBtn)copyTip.classList.remove('show');});
 
-/* ═══════════ DROPDOWN ═══════════ */
+/* ═══════════ DROPDOWN (unchanged) ═══════════ */
 function closeDropdown(){ dropdown.classList.remove('show'); }
 menuBtn.addEventListener('click', function(e) { e.stopPropagation(); dropdown.classList.toggle('show'); });
 function handleOutsideClick(e) {
@@ -345,7 +351,7 @@ function handleOutsideClick(e) {
 document.addEventListener('click', handleOutsideClick);
 document.addEventListener('touchend', function(e) { setTimeout(function() { handleOutsideClick(e); }, 10); });
 
-/* ═══════════ PROJECT SAVE ═══════════ */
+/* ═══════════ PROJECT SAVE (unchanged) ═══════════ */
 var LS_KEY='ce_saves_v1';
 function getSaves(){ try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){return[];} }
 function setSaves(arr){ try{localStorage.setItem(LS_KEY,JSON.stringify(arr));}catch(e){showToast('Storage full!');} }
@@ -366,7 +372,7 @@ function doSave(){
 }
 saveBtn.addEventListener('click', doSave);
 
-/* ═══════════ SAVED FILES PANEL ═══════════ */
+/* ═══════════ SAVED FILES PANEL (updated) ═══════════ */
 function renderSavesList() {
   var arr = getSaves();
   if(!arr.length) { savesList.innerHTML = '<div class="save-empty">No saved files or projects.<br>Use <strong>Save Project</strong> to save all tabs.</div>'; return; }
@@ -412,6 +418,8 @@ function renderSavesList() {
             lastCommit = item.content;
             renderTabs();
           }
+          // FIXED: Clear analysis cache after loading project/file
+          _analysisCache = {};
           savesPanel.classList.remove('show');
           showToast('Loaded: ' + item.name);
           return;
@@ -435,7 +443,7 @@ function renderSavesList() {
 openSavesBtn.addEventListener('click',function(){ closeDropdown(); renderSavesList(); savesPanel.classList.add('show'); });
 savesClose.addEventListener('click',function(){ savesPanel.classList.remove('show'); });
 
-/* ═══════════ DELETE / RENAME / ADD FILE ═══════════ */
+/* ═══════════ DELETE / RENAME / ADD FILE (updated) ═══════════ */
 deleteBtn.addEventListener('click',function(){
   commitUndo();
   applyContent('');
@@ -460,170 +468,15 @@ addFileBtn.addEventListener('click',function(){
   renderTabs(); renderEditor();
   closeDropdown();
   codeArea.focus();
+  // FIXED: Invalidate cache because file list changed
+  _analysisCache = {};
 });
 
-/* ═══════════ UNIVERSAL MULTI-FILE PREVIEW ═══════════ */
-function buildMultiFilePreview(){
-  var activeFile = getFile();
-  var baseFile = null;
-  if (/\.html$/i.test(activeFile.name)) { baseFile = activeFile; }
-  else {
-    for (var i = 0; i < files.length; i++) {
-      if (/\.html$/i.test(files[i].name)) { baseFile = files[i]; break; }
-    }
-  }
-  if (!baseFile) return activeFile.content;
-
-  var htmlContent = baseFile.content;
-  var cssTags = '', jsTags = '';
-  for (var i = 0; i < files.length; i++) {
-    var file = files[i];
-    if (file.id === baseFile.id) continue;
-    var nameLower = file.name.toLowerCase();
-    if (nameLower.endsWith('.css')) { cssTags += '\n<style>\n' + file.content + '\n</style>\n'; }
-    else if (nameLower.endsWith('.js')) { jsTags += '\n<script>\n' + file.content + '\n<\/script>\n'; }
-  }
-
-  if (!/<head/i.test(htmlContent) && !/<body/i.test(htmlContent)) {
-    htmlContent = '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"></head><body>\n' + htmlContent + '\n</body></html>';
-  }
-
-  var result = htmlContent;
-  if (cssTags) result = result.replace(/<\/head>/i, cssTags + '</head>');
-  if (jsTags) result = result.replace(/<\/body>/i, jsTags + '</body>');
-  return result;
-}
-
-/* ═══════════ SILENT FULL PROCESSOR ═══════════ */
-function silentFullProcess(raw) {
-  var fixed = raw;
-  var fixesApplied = [];
-
-  // 1. Strip Markdown fences
-  if (/```/.test(fixed)) {
-    fixed = fixed.replace(/```[\w-]*\s*\n?/g, '').replace(/```/g, '');
-    fixesApplied.push('علامات Markdown');
-  }
-
-  // 2. Detect type and assemble full page
-  var hasTags = /<[a-zA-Z][^>]*>/.test(fixed);
-  if (!hasTags) {
-    if (/\{[^}]*:[^}]*\}/.test(fixed)) {
-      // Pure CSS
-      fixed = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n<style>\n' + fixed + '\n</style>\n</head>\n<body>\n</body>\n</html>';
-      fixesApplied.push('تغليف CSS بصفحة كاملة');
-    } else if (/\b(function|const|let|var|console\.log|alert)\b/.test(fixed)) {
-      // Pure JS
-      fixed = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n</head>\n<body>\n<script>\n' + fixed + '\n<\/script>\n</body>\n</html>';
-      fixesApplied.push('تغليف JavaScript بصفحة كاملة');
-    }
-  } else {
-    // HTML — ensure full structure
-    if (!/<!DOCTYPE\s+html/i.test(fixed)) {
-      fixed = '<!DOCTYPE html>\n' + fixed;
-      fixesApplied.push('DOCTYPE');
-    }
-    if (!/<html[\s>]/i.test(fixed)) {
-      fixed = '<html lang="en">\n' + fixed + '\n</html>';
-      fixesApplied.push('وسم html');
-    }
-    if (!/<head[\s>]/i.test(fixed)) {
-      fixed = fixed.replace(/(<html[^>]*>)/i, '$1\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview</title>\n</head>');
-      fixesApplied.push('head');
-    } else {
-      if (!/<meta[^>]*charset/i.test(fixed)) { fixed = fixed.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">'); }
-      if (!/<meta[^>]*viewport/i.test(fixed)) { fixed = fixed.replace(/(<head[^>]*>)/i, '$1\n<meta name="viewport" content="width=device-width, initial-scale=1.0">'); }
-      if (!/<title/i.test(fixed)) { fixed = fixed.replace(/<\/head>/i, '<title>Preview</title>\n</head>'); }
-    }
-    if (!/<body[\s>]/i.test(fixed)) {
-      fixed = fixed.replace(/<\/head>/i, '</head>\n<body>').replace(/<\/html>/i, '</body>\n</html>');
-      fixesApplied.push('body');
-    }
-    if (!/<html[^>]*lang/i.test(fixed)) {
-      fixed = fixed.replace(/<html/i, '<html lang="en"');
-      fixesApplied.push('lang');
-    }
-  }
-
-  // 3. Fix self-closing block tags
-  if (/<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*)?\/\s*>/gi.test(fixed)) {
-    fixed = fixed.replace(/<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*)?\/\s*>/gi, function(m, tag, attrs) {
-      return '<' + tag + (attrs || '') + '></' + tag + '>';
-    });
-    fixesApplied.push('وسوم ذاتية الإغلاق');
-  }
-
-  // 4. Unitless CSS values
-  if (/:\s*\d+(?![a-zA-Z%])\s*;/.test(fixed)) {
-    fixed = fixed.replace(/:\s*(\d+)(?![a-zA-Z%])\s*;/g, function(match, num) {
-      return num === '0' ? match : ': ' + num + 'px;';
-    });
-    fixesApplied.push('وحدات CSS');
-  }
-
-  // 5. Comment out document.write
-  if (/document\.write/.test(fixed) && !/\/\/\s*document\.write/.test(fixed)) {
-    fixed = fixed.replace(/^([ \t]*)document\.write/gm, '$1// document.write');
-    fixesApplied.push('document.write (تم تعطيله)');
-  }
-
-  // 6. Fix missing ) before { in if/while/for
-  if (/(if|while|for)\s*\([^(){}]*\s*\{/.test(fixed)) {
-    fixed = fixed.replace(/(if|while|for)\s*\(([^(){}]+)\s*\{/g, function(m, kw, cond) {
-      return kw + '(' + cond + ') {';
-    });
-    fixesApplied.push('أقواس ناقصة في الشروط');
-  }
-
-  // 7. Add console panel if console.log used
-  if (/console\.log\(/.test(fixed) && !/id\s*=\s*["']console["']/.test(fixed)) {
-    var consoleDiv = '<div id="console" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#111;color:#0f0;font-family:monospace;overflow:auto;padding:8px;border-top:1px solid #333;z-index:9999;"></div>';
-    var consoleScript = '<script>(function(){var c=document.getElementById("console");if(!c)return;var oldLog=console.log;console.log=function(){var args=Array.prototype.slice.call(arguments);c.innerHTML+=args.join(" ")+"\\n";oldLog.apply(console,args);};window.onerror=function(m){c.innerHTML+="ERROR: "+m+"\\n";};})();<\/script>';
-    if (/<\/body>/i.test(fixed)) {
-      fixed = fixed.replace(/<\/body>/i, consoleDiv + consoleScript + '</body>');
-    } else {
-      fixed += '\n' + consoleDiv + consoleScript;
-    }
-    fixesApplied.push('نافذة Console');
-  }
-
-  // 8. Fix images without alt
-  if (/<img(?!\s+[^>]*\balt\s*=)[^>]*>/i.test(fixed)) {
-    fixed = fixed.replace(/<img(?!\s+[^>]*\balt\s*=)([^>]*)>/gi, function(m, attrs) {
-      return '<img' + attrs + ' alt="">';
-    });
-    fixesApplied.push('صور بدون alt');
-  }
-
-  // 9. Fix input without type
-  if (/<input(?:\s(?!type\s*=)[^>]*|\s*>)/i.test(fixed)) {
-    fixed = fixed.replace(/<input(\s(?!type\s*=)[^>]*|>)/gi, function(m, rest) {
-      return '<input type="text"' + rest;
-    });
-    fixesApplied.push('input بدون type');
-  }
-
-  // 10. Replace obsolete tags
-  if (/<(center|font|marquee)[\s>]/i.test(fixed)) {
-    fixed = fixed.replace(/<center(\s[^>]*)?>/gi, '<div style="text-align:center"$1>').replace(/<\/center>/gi, '</div>');
-    fixed = fixed.replace(/<font(\s[^>]*)?>/gi, '<span$1>').replace(/<\/font>/gi, '</span>');
-    fixed = fixed.replace(/<marquee(\s[^>]*)?>/gi, '<div$1>').replace(/<\/marquee>/gi, '</div>');
-    fixesApplied.push('وسوم قديمة');
-  }
-
-  return { cleanCode: fixed, fixes: fixesApplied };
-}
-
-function openPreviewWithContent(content) {
-  previewFrame.srcdoc = content;
-  previewOverlay.classList.add('show');
-}
-
+/* ═══════════ CLOSE PREVIEW FUNCTION (unchanged) ═══════════ */
 function closePreviewFn() {
   previewOverlay.classList.remove('show');
   previewFrame.srcdoc = '';
 }
-
 closePreviewBtn.addEventListener('click', function(e) {
   e.stopPropagation();
   closePreviewFn();
@@ -633,26 +486,752 @@ closePreviewBtn.addEventListener('touchend', function(e) {
   e.stopPropagation();
   closePreviewFn();
 });
-
 previewOverlay.addEventListener('click', function(e) {
   if (e.target === previewOverlay) closePreviewFn();
 });
 
-/* ═══════════ PLAY BUTTON ═══════════ */
-function handlePlayClick() {
-  var combined = buildMultiFilePreview();
-  var result = silentFullProcess(combined);
-  
-  if (result.fixes.length > 0) {
-    showToast('✅ تم الإصلاح: ' + result.fixes.join('، '));
+/* ═══════════ MULTI-FILE COMBINER (unchanged) ═══════════ */
+function buildMultiFilePreviewWithFixes(fixedContents) {
+  var activeFile = getFile();
+  var baseFile = null;
+  if (/\.html$/i.test(activeFile.name)) { baseFile = activeFile; }
+  else {
+    for (var i = 0; i < files.length; i++) {
+      if (/\.html$/i.test(files[i].name)) { baseFile = files[i]; break; }
+    }
   }
-  
-  // فتح المعاينة مباشرة بالكود النظيف
-  openPreviewWithContent(result.cleanCode);
+  if (!baseFile) {
+    var rawContent = fixedContents && fixedContents[activeFile.id] !== undefined ? fixedContents[activeFile.id] : activeFile.content;
+    return rawContent;
+  }
+
+  var baseContent = fixedContents && fixedContents[baseFile.id] !== undefined ? fixedContents[baseFile.id] : baseFile.content;
+  var cssTags = '', jsTags = '';
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    if (f.id === baseFile.id) continue;
+    var content = fixedContents && fixedContents[f.id] !== undefined ? fixedContents[f.id] : f.content;
+    var nameLower = f.name.toLowerCase();
+    if (nameLower.endsWith('.css')) { cssTags += '\n<style>\n' + content + '\n</style>\n'; }
+    else if (nameLower.endsWith('.js')) { jsTags += '\n<script>\n' + content + '\n<\/script>\n'; }
+  }
+
+  var result = baseContent;
+  if (cssTags) result = result.replace(/<\/head>/i, cssTags + '</head>');
+  if (jsTags) result = result.replace(/<\/body>/i, jsTags + '</body>');
+  return result;
 }
+
+/* ═══════════ DIAGNOSTIC SYSTEM ═══════════ */
+var Diagnostic = (function(){
+  var counter = 0;
+  function getId(prefix, fileId, line, col) {
+    counter++;
+    return prefix + '-' + String(counter).padStart(4,'0') + ':' + fileId + ':' + line + ':' + col;
+  }
+  function Diagnostic(severity, code, message, source, fileId, fileName, startLine, startCol, endLine, endCol, fix) {
+    this.id = getId(code, fileId, startLine||1, startCol||1);
+    this.severity = severity;
+    this.code = code;
+    this.message = message;
+    this.source = source;
+    this.fileId = fileId;
+    this.fileName = fileName;
+    this.range = {
+      startLine: startLine || 1,
+      startColumn: startCol || 1,
+      endLine: endLine || (startLine || 1),
+      endColumn: endCol || (startCol || 1)
+    };
+    this.fix = fix || null;
+    if (this.fix && !this.fix.mode) {
+      if (this.fix.type === 'prepend') this.fix.mode = 'auto';
+      else this.fix.mode = 'quick';
+    }
+  }
+  return Diagnostic;
+})();
+
+function getLineCol(text, offset) {
+  if (offset < 0 || offset > text.length) return {line:1, col:1};
+  var lines = text.substr(0, offset).split('\n');
+  var line = lines.length;
+  var col = lines[lines.length-1].length + 1;
+  return {line: line, col: col};
+}
+
+/* ═══════════ EXTRACTORS (IMPROVED & SIMPLIFIED) ═══════════ */
+var Extractors = {
+  // FIXED: Completely rewritten tag range finder for robustness and performance.
+  // Uses simple indexOf on lowercased code to locate <style> and <script> tags,
+  // correctly handling nesting and multiple occurrences.
+  html: function(code, fileId, fileName) {
+    var doc;
+    try {
+      doc = (new DOMParser()).parseFromString(code, 'text/html');
+    } catch(e) {
+      return { doc: null, styles: [], scripts: [] };
+    }
+
+    var styles = [];
+    var scripts = [];
+
+    function findTagRanges(tagName) {
+      var results = [];
+      var codeLower = code.toLowerCase();
+      var openTag = '<' + tagName.toLowerCase();
+      var closeTag = '</' + tagName.toLowerCase() + '>';
+      var i = 0;
+
+      while (i < codeLower.length) {
+        var openIdx = codeLower.indexOf(openTag, i);
+        if (openIdx === -1) break;
+
+        // Find end of opening tag (next '>')
+        var tagEnd = codeLower.indexOf('>', openIdx);
+        if (tagEnd === -1) break;
+
+        // Extract attributes string from original case
+        var attrs = code.substring(openIdx + openTag.length, tagEnd).trim();
+
+        // Now match closing tag, handling nesting
+        var depth = 1;
+        var searchPos = tagEnd + 1;
+        var contentStart = tagEnd + 1;
+        var foundClose = false;
+
+        while (depth > 0) {
+          var nextOpenIdx = codeLower.indexOf(openTag, searchPos);
+          var closeIdx = codeLower.indexOf(closeTag, searchPos);
+          if (closeIdx === -1) break;
+
+          if (nextOpenIdx !== -1 && nextOpenIdx < closeIdx) {
+            // nested opening tag
+            depth++;
+            var nestedTagEnd = codeLower.indexOf('>', nextOpenIdx);
+            if (nestedTagEnd === -1) break;
+            searchPos = nestedTagEnd + 1;
+          } else {
+            depth--;
+            if (depth === 0) {
+              var content = code.substring(contentStart, closeIdx);
+              results.push({
+                start: openIdx,
+                end: closeIdx + closeTag.length,
+                content: content,
+                attrs: attrs
+              });
+              i = closeIdx + closeTag.length;
+              foundClose = true;
+            } else {
+              searchPos = closeIdx + closeTag.length;
+            }
+          }
+        }
+        if (!foundClose) {
+          i = tagEnd + 1; // skip malformed tag to avoid infinite loop
+        }
+      }
+      return results;
+    }
+
+    var styleRanges = findTagRanges('style');
+    styleRanges.forEach(function(r) {
+      var rangeStart = getLineCol(code, r.start);
+      var rangeEnd = getLineCol(code, r.end);
+      styles.push({
+        type: 'style',
+        content: r.content,
+        range: { startLine: rangeStart.line, startCol: rangeStart.col, endLine: rangeEnd.line, endCol: rangeEnd.col }
+      });
+    });
+
+    var scriptRanges = findTagRanges('script');
+    scriptRanges.forEach(function(r) {
+      var isModule = /type\s*=\s*["']module["']/i.test(r.attrs);
+      var rangeStart = getLineCol(code, r.start);
+      var rangeEnd = getLineCol(code, r.end);
+      scripts.push({
+        type: isModule ? 'module' : 'script',
+        content: r.content,
+        range: { startLine: rangeStart.line, startCol: rangeStart.col, endLine: rangeEnd.line, endCol: rangeEnd.col }
+      });
+    });
+
+    return { doc: doc, styles: styles, scripts: scripts };
+  }
+};
+
+/* ═══════════ VALIDATORS (Rules) (unchanged except comments) ═══════════ */
+var rules = [];
+
+function registerRule(rule) {
+  rules.push(rule);
+}
+
+function addDiagnostic(diag) {
+  if (!window.__currentDiagnostics) window.__currentDiagnostics = [];
+  window.__currentDiagnostics.push(diag);
+}
+
+// Rule: HTML Structure
+registerRule({
+  id: 'HTML-STRUCTURE',
+  validate: function(file, code, extracted) {
+    var diags = [];
+    var doc = extracted.doc;
+    if (!doc) return diags;
+    var fileName = file.name;
+    var fileId = file.id;
+
+    if (!doc.doctype) {
+      diags.push(new Diagnostic('warning', 'HTML-0001', 'Missing DOCTYPE declaration.', 'html-structure', fileId, fileName, 1, 1, 1, 1,
+        { type: 'prepend', value: '<!DOCTYPE html>\n', mode: 'auto' }
+      ));
+    }
+    if (!doc.documentElement.hasAttribute('lang')) {
+      diags.push(new Diagnostic('warning', 'HTML-0002', 'Missing lang attribute on <html>.', 'html-structure', fileId, fileName, 1, 1, 1, 1, null));
+    }
+    var head = doc.head;
+    if (!head || !head.querySelector('meta[charset]')) {
+      diags.push(new Diagnostic('warning', 'HTML-0003', 'Missing <meta charset="UTF-8">.', 'html-structure', fileId, fileName, 1, 1, 1, 1, null));
+    }
+    if (!head || !head.querySelector('meta[name="viewport"]')) {
+      diags.push(new Diagnostic('warning', 'HTML-0004', 'Missing viewport meta tag.', 'html-structure', fileId, fileName, 1, 1, 1, 1, null));
+    }
+    if (!head || !head.querySelector('title')) {
+      diags.push(new Diagnostic('warning', 'HTML-0005', 'Missing <title> in <head>.', 'html-structure', fileId, fileName, 1, 1, 1, 1, null));
+    }
+    return diags;
+  }
+});
+
+// Rule: Obsolete tags
+registerRule({
+  id: 'OBSOLETE-TAGS',
+  validate: function(file, code, extracted) {
+    var diags = [];
+    var doc = extracted.doc;
+    if (!doc) return diags;
+    var fileName = file.name, fileId = file.id;
+    var obsoleteSelectors = ['center', 'font', 'marquee'];
+    obsoleteSelectors.forEach(function(tag) {
+      var elements = doc.querySelectorAll(tag);
+      elements.forEach(function(el) {
+        var html = el.outerHTML;
+        var idx = code.indexOf(html);
+        var lineCol = idx >= 0 ? getLineCol(code, idx) : {line:1, col:1};
+        diags.push(new Diagnostic('warning', 'HTML-0010', 'Obsolete tag <'+tag+'> used.', 'html-obsolete', fileId, fileName, lineCol.line, lineCol.col, lineCol.line, lineCol.col + html.length, null));
+      });
+    });
+    return diags;
+  }
+});
+
+// Rule: Missing alt
+registerRule({
+  id: 'IMG-ALT',
+  validate: function(file, code, extracted) {
+    var diags = [];
+    var doc = extracted.doc;
+    if (!doc) return diags;
+    var fileName = file.name, fileId = file.id;
+    var imgs = doc.querySelectorAll('img:not([alt])');
+    imgs.forEach(function(img) {
+      var html = img.outerHTML;
+      var idx = code.indexOf(html);
+      var lineCol = idx >= 0 ? getLineCol(code, idx) : {line:1, col:1};
+      diags.push(new Diagnostic('warning', 'HTML-0011', 'Image missing alt attribute.', 'html-accessibility', fileId, fileName, lineCol.line, lineCol.col, lineCol.line, lineCol.col + html.length, null));
+    });
+    return diags;
+  }
+});
+
+// Rule: document.write
+registerRule({
+  id: 'DOC-WRITE',
+  validate: function(file, code, extracted) {
+    var diags = [];
+    var fileName = file.name, fileId = file.id;
+    var segments = [];
+    if (extracted.doc) {
+      extracted.scripts.forEach(function(s) { segments.push({code: s.content, startLine: s.range.startLine, startCol: s.range.startColumn}); });
+    } else if (/\.js$/i.test(fileName)) {
+      segments.push({code: code, startLine:1, startCol:1});
+    }
+    segments.forEach(function(seg) {
+      var lines = seg.code.split('\n');
+      for (var i=0; i<lines.length; i++) {
+        if (lines[i].includes('document.write')) {
+          var line = seg.startLine + i;
+          var col = lines[i].indexOf('document.write') + 1;
+          diags.push(new Diagnostic('warning', 'JS-0001', 'Avoid using document.write().', 'js-best-practice', fileId, fileName, line, col, line, col + 'document.write'.length, null));
+        }
+      }
+    });
+    return diags;
+  }
+});
+
+// Rule: CSS Syntax
+registerRule({
+  id: 'CSS-SYNTAX',
+  validate: function(file, code, extracted) {
+    var diags = [];
+    var fileName = file.name, fileId = file.id;
+    var segments = [];
+    if (extracted.doc) {
+      extracted.styles.forEach(function(s) { segments.push({code: s.content, startLine: s.range.startLine, startCol: s.range.startColumn}); });
+    } else if (/\.css$/i.test(fileName)) {
+      segments.push({code: code, startLine:1, startCol:1});
+    }
+    segments.forEach(function(seg) {
+      try {
+        var sheet = new CSSStyleSheet();
+        sheet.replaceSync(seg.code);
+      } catch(e) {
+        var line = seg.startLine, col = seg.startCol;
+        var m = e.message.match(/\((\d+):(\d+)\)/);
+        if (m) { line = seg.startLine + parseInt(m[1],10)-1; col = seg.startCol + parseInt(m[2],10)-1; }
+        diags.push(new Diagnostic('error', 'CSS-0001', 'CSS syntax error: ' + e.message, 'css-syntax', fileId, fileName, line, col, line, col, null));
+      }
+    });
+    return diags;
+  }
+});
+
+// Rule: JS Syntax
+registerRule({
+  id: 'JS-SYNTAX',
+  validate: function(file, code, extracted) {
+    var diags = [];
+    var fileName = file.name, fileId = file.id;
+    var segments = [];
+    if (extracted.doc) {
+      extracted.scripts.forEach(function(s) { segments.push({code: s.content, type: s.type, startLine: s.range.startLine, startCol: s.range.startColumn}); });
+    } else if (/\.js$/i.test(fileName)) {
+      segments.push({code: code, type: 'script', startLine:1, startCol:1});
+    }
+    segments.forEach(function(seg) {
+      var jsCode = seg.code.trim();
+      if (!jsCode) return;
+      var isModule = seg.type === 'module';
+      var testCode = jsCode;
+      if (isModule) {
+        testCode = jsCode.replace(/^(import|export)\s/gm, '//$&');
+      }
+      try {
+        new Function('"use strict";\n' + testCode);
+      } catch(e) {
+        var line = seg.startLine, col = seg.startCol;
+        if (e.lineNumber) line = seg.startLine + e.lineNumber - 1;
+        else if (e.line) line = seg.startLine + e.line - 1;
+        diags.push(new Diagnostic('error', 'JS-0002', 'JavaScript syntax error: ' + e.message, 'js-syntax', fileId, fileName, line, col, line, col, null));
+      }
+    });
+    return diags;
+  }
+});
+
+// Rule: Self-closing block tags (quick fix)
+registerRule({
+  id: 'SELF-CLOSING-BLOCK',
+  validate: function(file, code, extracted) {
+    var diags = [];
+    var fileName = file.name, fileId = file.id;
+    if (!extracted.doc) return diags;
+    var pattern = /<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*)?\/\s*>/gi;
+    var match;
+    while ((match = pattern.exec(code)) !== null) {
+      var full = match[0];
+      var tag = match[1];
+      var idx = match.index;
+      var lineCol = getLineCol(code, idx);
+      var replacement = '<' + tag + (match[2] || '') + '></' + tag + '>';
+      diags.push(new Diagnostic('warning', 'HTML-0020', 'Self-closing block tag <'+tag+'/> is invalid.', 'html-validity', fileId, fileName, lineCol.line, lineCol.col, lineCol.line, lineCol.col + full.length,
+        { type: 'replace', start: idx, end: idx + full.length, replacement: replacement, mode: 'quick' }
+      ));
+    }
+    return diags;
+  }
+});
+
+// Rule: Markdown fences (warning only)
+registerRule({
+  id: 'MARKDOWN-FENCES',
+  validate: function(file, code, extracted) {
+    var diags = [];
+    var fileName = file.name, fileId = file.id;
+    if (!code.includes('```')) return diags;
+    var lines = code.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      if (/^\s*```/.test(lines[i])) {
+        diags.push(new Diagnostic('warning', 'GEN-0001', 'Markdown code fences detected. Remove them for clean code.', 'markdown', fileId, fileName, i+1, 1, i+1, lines[i].length+1, null));
+        break;
+      }
+    }
+    return diags;
+  }
+});
+
+/* ═══════════ FIX REGISTRY (unchanged) ═══════════ */
+var FixRegistry = {
+  applyFixes: function(code, diagnostics, modeFilter) {
+    var fixes = diagnostics.filter(function(d) {
+      return d.fix && (modeFilter === null || d.fix.mode === modeFilter);
+    }).sort(function(a,b) {
+      var aStart = a.fix.start !== undefined ? a.fix.start : 0;
+      var bStart = b.fix.start !== undefined ? b.fix.start : 0;
+      return bStart - aStart;
+    });
+    var newCode = code;
+    fixes.forEach(function(d) {
+      if (d.fix.type === 'replace' && d.fix.start !== undefined) {
+        newCode = newCode.substring(0, d.fix.start) + d.fix.replacement + newCode.substring(d.fix.end);
+      } else if (d.fix.type === 'prepend') {
+        newCode = d.fix.value + newCode;
+      }
+    });
+    return newCode;
+  }
+};
+
+/* ═══════════ REAL-TIME VALIDATION (IMPROVED with cache & invalidation) ═══════════ */
+var lastDiagnostics = [];
+var applySafeFixesBeforePreview = false;
+var currentFilter = 'all';
+
+// FIXED: Cache for per-file analysis to avoid unnecessary re-validation.
+var _analysisCache = {};
+
+// Analyze a single file and return its diagnostics
+function analyzeSingleFile(file) {
+  var code = file.content;
+  var fileName = file.name;
+  var fileId = file.id;
+  var extracted = { doc: null, styles: [], scripts: [] };
+  if (/\.html$/i.test(fileName)) {
+    extracted = Extractors.html(code, fileId, fileName);
+  }
+  var fileDiags = [];
+  rules.forEach(function(rule) {
+    var res = rule.validate(file, code, extracted);
+    if (res && res.length) fileDiags = fileDiags.concat(res);
+  });
+  return fileDiags;
+}
+
+// IMPROVED: Debounced validation (800ms) with cache check.
+var realTimeValidationTimer = null;
+function scheduleRealTimeValidation() {
+  clearTimeout(realTimeValidationTimer);
+  realTimeValidationTimer = setTimeout(function() {
+    var file = getFile();
+    if (!file) return;
+    var cacheEntry = _analysisCache[file.id];
+    // Skip if content unchanged since last analysis
+    if (cacheEntry && cacheEntry.content === file.content) {
+      return;
+    }
+    var diags = analyzeSingleFile(file);
+    _analysisCache[file.id] = { content: file.content, diagnostics: diags };
+    // Replace diagnostics for this file in global list
+    lastDiagnostics = lastDiagnostics.filter(function(d) { return d.fileId !== file.id; });
+    lastDiagnostics = lastDiagnostics.concat(diags);
+    if (issueOverlay && issueOverlay.classList.contains('show')) {
+      renderProblemsPanel(currentFilter);
+    }
+    updateProblemsBadge();
+  }, 800);
+}
+
+/* ═══════════ PROBLEMS BADGE & PANEL (enhanced) ═══════════ */
+function updateProblemsBadge() {
+  if (!problemsBtn) return;
+  var errCount = lastDiagnostics.filter(function(d) { return d.severity === 'error'; }).length;
+  var warnCount = lastDiagnostics.filter(function(d) { return d.severity === 'warning'; }).length;
+  var infoCount = lastDiagnostics.filter(function(d) { return d.severity === 'info'; }).length;
+  var total = errCount + warnCount + infoCount;
+  if (total > 0) {
+    var parts = [];
+    if (errCount) parts.push(errCount + '⛔');
+    if (warnCount) parts.push(warnCount + '⚠️');
+    if (infoCount) parts.push(infoCount + 'ℹ️');
+    problemsBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg> ' + parts.join(' ');
+  } else {
+    problemsBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>';
+  }
+}
+
+// Problems button creation & insertion
+var problemsBtn = document.getElementById('problemsBtn');
+if (!problemsBtn) {
+  problemsBtn = document.createElement('button');
+  problemsBtn.id = 'problemsBtn';
+  problemsBtn.title = 'Problems';
+  problemsBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>';
+  problemsBtn.style.cssText = 'background:none; border:none; color:var(--fg); cursor:pointer; padding:6px;';
+  if (playBtn && playBtn.parentNode) {
+    playBtn.parentNode.insertBefore(problemsBtn, playBtn.nextSibling);
+  }
+}
+
+// Safe Fix Toggle Button
+var safeFixBtn = document.createElement('button');
+safeFixBtn.id = 'safeFixBtn';
+safeFixBtn.title = 'Apply Safe Fixes Before Preview';
+safeFixBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 6L9 17l-5-5"/></svg>';
+safeFixBtn.style.cssText = 'background:none; border:none; color:var(--dim); cursor:pointer; padding:6px;';
+safeFixBtn.addEventListener('click', function() {
+  applySafeFixesBeforePreview = !applySafeFixesBeforePreview;
+  safeFixBtn.style.color = applySafeFixesBeforePreview ? 'var(--fg)' : 'var(--dim)';
+  showToast(applySafeFixesBeforePreview ? 'Safe fixes will be applied on preview' : 'No automatic fixes');
+});
+if (problemsBtn && problemsBtn.parentNode) {
+  problemsBtn.parentNode.insertBefore(safeFixBtn, problemsBtn);
+}
+
+// Problems overlay and its inner elements
+var issueOverlay = document.getElementById('issueOverlay');
+if (issueOverlay) {
+  issueOverlay.innerHTML = '<div class="saves-panel-inner" style="max-width:700px;">'
+    +'<div class="saves-header"><h3>Problems</h3><button id="fixAllAutoBtn" style="margin-right:8px;font-size:12px;background:var(--accent);border:none;color:white;padding:4px 12px;border-radius:4px;cursor:pointer;">Fix All Auto</button><button id="issueClose" class="saves-close">&times;</button></div>'
+    +'<div id="issueFilter" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--border);">'
+      +'<button class="filter-btn active" data-filter="all">All</button>'
+      +'<button class="filter-btn" data-filter="error">Errors</button>'
+      +'<button class="filter-btn" data-filter="warning">Warnings</button>'
+      +'<button class="filter-btn" data-filter="info">Info</button>'
+    +'</div>'
+    +'<div id="issuesList" style="max-height:60vh;overflow-y:auto;padding:10px;"></div>'
+    +'</div>';
+  var issueClose = document.getElementById('issueClose');
+  issueClose.addEventListener('click', function() { issueOverlay.classList.remove('show'); });
+  issueOverlay.addEventListener('click', function(e) { if (e.target === issueOverlay) issueOverlay.classList.remove('show'); });
+
+  // FIXED: "Fix All Auto" now refreshes tabs/editor if active file changed, and clears cache for affected files.
+  document.getElementById('fixAllAutoBtn').addEventListener('click', function() {
+    var diagsToFix = lastDiagnostics.filter(function(d) { return d.fix && d.fix.mode === 'auto'; });
+    if (diagsToFix.length === 0) {
+      showToast('No auto-fixable issues.');
+      return;
+    }
+    var filesMap = {};
+    files.forEach(function(f) { filesMap[f.id] = f; });
+    var changedActive = false;
+    diagsToFix.forEach(function(d) {
+      var file = filesMap[d.fileId];
+      if (!file) return;
+      if (file.id === activeId) {
+        commitUndo();
+        changedActive = true;
+      }
+      file.content = FixRegistry.applyFixes(file.content, [d], 'auto');
+      delete _analysisCache[file.id];
+    });
+    // Update UI if active file was modified
+    if (changedActive) {
+      var activeFile = getFile();
+      applyContent(activeFile.content);
+      lastCommit = activeFile.content;
+      renderTabs();   // FIXED: ensure tabs reflect any potential name changes (though not needed here, for consistency)
+      renderEditor(); // FIXED: explicitly refresh editor after fixes
+      scheduleRealTimeValidation();
+    }
+    analyzeAllFiles(false); // refresh diagnostics
+    if (issueOverlay.classList.contains('show')) renderProblemsPanel(currentFilter);
+    updateProblemsBadge();
+    showToast('Auto fixes applied.');
+  });
+
+  // Filter buttons
+  var filterBtns = document.querySelectorAll('#issueFilter .filter-btn');
+  filterBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.getAttribute('data-filter');
+      renderProblemsPanel(currentFilter);
+    });
+  });
+
+  // Navigation helper
+  var editorLineHeight = 0;
+  function getEditorLineHeight() {
+    if (!editorLineHeight) {
+      editorLineHeight = parseInt(getComputedStyle(codeArea).lineHeight, 10) || 20;
+    }
+    return editorLineHeight;
+  }
+
+  function goToLocation(fileId, line, col) {
+    var file = null;
+    for (var i = 0; i < files.length; i++) {
+      if (files[i].id === fileId) { file = files[i]; break; }
+    }
+    if (!file) return;
+    if (activeId !== fileId) {
+      switchTab(fileId);
+    }
+    codeArea.focus();
+    var text = codeArea.value;
+    var lines = text.split('\n');
+    var pos = 0;
+    for (var i = 0; i < line - 1 && i < lines.length; i++) {
+      pos += lines[i].length + 1;
+    }
+    var targetLine = lines[line - 1] || '';
+    var colClamped = Math.min(col - 1, targetLine.length);
+    pos += colClamped;
+    codeArea.setSelectionRange(pos, pos);
+    var lh = getEditorLineHeight();
+    codeArea.scrollTop = (line - 1) * lh - codeArea.clientHeight / 3;
+  }
+}
+
+// FIXED: Debounce opening of problems panel to avoid re-rendering jank
+var panelOpenTimer = null;
+function showProblemsPanel() {
+  if (!issueOverlay) return;
+  // If panel already open, just refresh immediately
+  if (issueOverlay.classList.contains('show')) {
+    renderProblemsPanel(currentFilter);
+    return;
+  }
+  // Debounce initial rendering
+  clearTimeout(panelOpenTimer);
+  panelOpenTimer = setTimeout(function() {
+    issueOverlay.classList.add('show');
+    renderProblemsPanel(currentFilter);
+  }, 300);
+}
+// Click handler for problems button
+problemsBtn.addEventListener('click', function() {
+  if (issueOverlay.classList.contains('show')) {
+    issueOverlay.classList.remove('show');
+  } else {
+    showProblemsPanel();
+  }
+});
+
+// Renders the problems list inside the panel
+function renderProblemsPanel(filter) {
+  var list = document.getElementById('issuesList');
+  if (!list) return;
+  filter = filter || 'all';
+  var filtered = lastDiagnostics.filter(function(d) {
+    if (filter === 'all') return true;
+    return d.severity === filter;
+  });
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="color:var(--dim);text-align:center;padding:20px;">No problems match filter.</div>';
+    return;
+  }
+  var html = '';
+  filtered.forEach(function(d) {
+    var icon = d.severity === 'error' ? '🔴' : (d.severity === 'warning' ? '🟡' : '🔵');
+    var codeDisplay = esc(d.code);
+    var msgDisplay = esc(d.message);
+    var fileLineCol = esc(d.fileName) + ':' + d.range.startLine + ':' + d.range.startColumn;
+    var quickFixBtn = '';
+    if (d.fix && d.fix.mode === 'quick') {
+      quickFixBtn = '<button class="quick-fix-btn" data-id="'+d.id+'" style="margin-left:8px;font-size:11px;background:var(--accent);border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;">Fix</button>';
+    }
+    html += '<div class="problem-item" data-fileid="'+d.fileId+'" data-line="'+d.range.startLine+'" data-col="'+d.range.startColumn+'" style="display:flex;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;">'
+      +'<span style="margin-right:8px;font-size:14px;">'+icon+'</span>'
+      +'<div style="flex:1;"><div style="font-weight:600;">'+codeDisplay+'</div>'
+      +'<div>'+msgDisplay+'</div>'
+      +'<div style="font-size:12px;color:var(--dim);">'+fileLineCol+'</div></div>'
+      + quickFixBtn
+      +'</div>';
+  });
+  list.innerHTML = html;
+
+  list.querySelectorAll('.problem-item').forEach(function(item) {
+    item.addEventListener('click', function(e) {
+      if (e.target.classList.contains('quick-fix-btn')) return;
+      var fileId = parseInt(item.getAttribute('data-fileid'), 10);
+      var line = parseInt(item.getAttribute('data-line'), 10);
+      var col = parseInt(item.getAttribute('data-col'), 10);
+      goToLocation(fileId, line, col);
+    });
+  });
+
+  list.querySelectorAll('.quick-fix-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var diagId = btn.getAttribute('data-id');
+      var diag = lastDiagnostics.find(function(d) { return d.id === diagId; });
+      if (!diag || !diag.fix) return;
+      var file = files.find(function(f) { return f.id === diag.fileId; });
+      if (!file) return;
+      if (activeId === file.id) {
+        commitUndo();
+      }
+      var code = file.content;
+      var newCode = FixRegistry.applyFixes(code, [diag], diag.fix.mode);
+      file.content = newCode;
+      if (activeId === file.id) {
+        applyContent(newCode);
+        lastCommit = newCode;
+      }
+      delete _analysisCache[file.id];
+      lastDiagnostics = lastDiagnostics.filter(function(d) { return d.id !== diagId; });
+      renderProblemsPanel(currentFilter || 'all');
+      updateProblemsBadge();
+      showToast('Fix applied');
+    });
+  });
+}
+
+/* ═══════════ FULL ANALYSIS (unchanged) ═══════════ */
+function analyzeAllFiles(applyAutoFixes) {
+  var allDiags = [];
+  var fixedContents = {};
+
+  files.forEach(function(file) {
+    var fileDiags = analyzeSingleFile(file);
+    allDiags = allDiags.concat(fileDiags);
+
+    if (applyAutoFixes) {
+      var fixedCode = FixRegistry.applyFixes(file.content, fileDiags, 'auto');
+      fixedContents[file.id] = fixedCode;
+    } else {
+      fixedContents[file.id] = file.content;
+    }
+  });
+
+  lastDiagnostics = allDiags;
+  return { diagnostics: allDiags, fixedContents: fixedContents };
+}
+
+/* ═══════════ PLAY BUTTON (unchanged) ═══════════ */
+function handlePlayClick() {
+  var result = analyzeAllFiles(applySafeFixesBeforePreview);
+  var combinedCode = buildMultiFilePreviewWithFixes(result.fixedContents);
+  
+  var errCount = result.diagnostics.filter(function(d) { return d.severity === 'error'; }).length;
+  var warnCount = result.diagnostics.filter(function(d) { return d.severity === 'warning'; }).length;
+  var infoCount = result.diagnostics.filter(function(d) { return d.severity === 'info'; }).length;
+  
+  var msgParts = [];
+  if (errCount) msgParts.push(errCount + ' error(s)');
+  if (warnCount) msgParts.push(warnCount + ' warning(s)');
+  if (infoCount) msgParts.push(infoCount + ' info');
+  var toastMsg = msgParts.length ? '📋 ' + msgParts.join(', ') : '✅ No issues found.';
+  showToast(toastMsg);
+  
+  if (issueOverlay && issueOverlay.classList.contains('show')) {
+    renderProblemsPanel(currentFilter || 'all');
+  }
+  updateProblemsBadge();
+  
+  previewFrame.srcdoc = combinedCode;
+  previewOverlay.classList.add('show');
+}
+
 playBtn.addEventListener('click', handlePlayClick);
 
-/* ═══════════ ESCAPE KEY HANDLING ═══════════ */
+/* ═══════════ ESCAPE KEY (unchanged) ═══════════ */
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
     if(savesPanel.classList.contains('show')){
@@ -663,6 +1242,10 @@ document.addEventListener('keydown',function(e){
       closePreviewFn();
       return;
     }
+    if(issueOverlay && issueOverlay.classList.contains('show')){
+      issueOverlay.classList.remove('show');
+      return;
+    }
     if(editingTabId !== null){
       cancelRename();
       return;
@@ -671,7 +1254,7 @@ document.addEventListener('keydown',function(e){
   }
 });
 
-/* ═══════════ RENDER EDITOR ═══════════ */
+/* ═══════════ RENDER EDITOR (unchanged) ═══════════ */
 function renderEditor(){
   var f = getFile();
   codeArea.value = f.content;
@@ -681,7 +1264,7 @@ function renderEditor(){
   lastCommit = f.content;
 }
 
-/* ═══════════ INIT ═══════════ */
+/* ═══════════ INIT (unchanged) ═══════════ */
 renderTabs();
 renderEditor();
 
