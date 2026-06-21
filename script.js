@@ -502,10 +502,9 @@ var previewContentCache = '';
 function detectIssues(html) {
   var issues = [];
   var cleaned = html;
-
   var hasTags = /<[a-zA-Z][^>]*>/.test(cleaned);
 
-  // 1. Markdown code fences
+  // ========== 1. Markdown ==========
   if (/```/.test(cleaned)) {
     issues.push({
       type: 'markdown',
@@ -514,29 +513,29 @@ function detectIssues(html) {
     });
   }
 
-  // 2. Missing <!DOCTYPE html>
+  // ========== 2. DOCTYPE ==========
   if (!/<!DOCTYPE\s+html/i.test(cleaned)) {
     issues.push({
       type: 'no-doctype',
-      message: 'لا يوجد <!DOCTYPE html>. قد يعمل المتصفح في وضع المراوغات.',
+      message: 'لا يوجد <!DOCTYPE html>.',
       fix: function(h) { return '<!DOCTYPE html>\n' + h; }
     });
   }
 
-  // 3. Missing <html> tag
+  // ========== 3. No <html> ==========
   if (!/<html[\s>]/i.test(cleaned)) {
     issues.push({
       type: 'no-html-tag',
-      message: 'لا يوجد وسم <html>. ستتم إضافته.',
+      message: 'لا يوجد وسم <html>.',
       fix: function(h) { return '<!DOCTYPE html>\n<html>\n' + h + '\n</html>'; }
     });
   }
 
-  // 4. Missing <head> and <body> but has other tags
+  // ========== 4. Missing <head> & <body> ==========
   if (hasTags && !/<head[\s>]/i.test(cleaned) && !/<body[\s>]/i.test(cleaned)) {
     issues.push({
       type: 'no-head-body',
-      message: 'يحتوي وسوماً HTML لكن بدون <head> أو <body>. سيتم إضافتهما.',
+      message: 'يحتوي وسوماً HTML لكن بدون <head> أو <body>.',
       fix: function(h) {
         return h.replace(/(<html[^>]*>)/i, '$1\n<head><meta charset="UTF-8"></head>\n<body>')
                 .replace(/<\/html>/i, '</body>\n</html>');
@@ -544,7 +543,7 @@ function detectIssues(html) {
     });
   }
 
-  // 5. Duplicate structural tags
+  // ========== 5. Duplicate structural tags ==========
   var countTag = function(tag, h) {
     return (h.match(new RegExp('<' + tag + '[\\s>]', 'gi')) || []).length;
   };
@@ -552,66 +551,60 @@ function detectIssues(html) {
     if (countTag(tag, cleaned) > 1) {
       issues.push({
         type: 'duplicate-' + tag,
-        message: 'يوجد أكثر من وسم <' + tag + '>. قد يسبب سلوكاً غير متوقع.',
+        message: 'يوجد أكثر من وسم <' + tag + '>.',
         fix: null
       });
     }
   });
 
-  // 6. Missing <meta charset>
+  // ========== 6. Missing charset ==========
   if (hasTags && /<head/i.test(cleaned) && !/<meta[^>]*charset/i.test(cleaned)) {
     issues.push({
       type: 'no-charset',
-      message: 'لا يوجد <meta charset="UTF-8">. قد تظهر الرموز مشوهة.',
-      fix: function(h) {
-        return h.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">');
-      }
+      message: 'لا يوجد <meta charset="UTF-8">.',
+      fix: function(h) { return h.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">'); }
     });
   }
 
-  // 7. Missing viewport
+  // ========== 7. Missing viewport ==========
   if (hasTags && /<head/i.test(cleaned) && !/<meta[^>]*name\s*=\s*["']viewport["'][^>]*>/i.test(cleaned)) {
     issues.push({
       type: 'no-viewport',
-      message: 'لا يوجد <meta viewport>. التصميم لن يتجاوب على الجوال.',
-      fix: function(h) {
-        return h.replace(/(<head[^>]*>)/i, '$1\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
-      }
+      message: 'لا يوجد <meta viewport>.',
+      fix: function(h) { return h.replace(/(<head[^>]*>)/i, '$1\n<meta name="viewport" content="width=device-width, initial-scale=1.0">'); }
     });
   }
 
-  // 8. Missing <title>
+  // ========== 8. Missing <title> ==========
   if (hasTags && /<head/i.test(cleaned) && !/<title[^>]*>/i.test(cleaned)) {
     issues.push({
       type: 'no-title',
-      message: 'لا يوجد وسم <title> في الرأس.',
-      fix: function(h) {
-        return h.replace(/<\/head>/i, '<title>Preview</title>\n</head>');
-      }
+      message: 'لا يوجد وسم <title>.',
+      fix: function(h) { return h.replace(/<\/head>/i, '<title>Preview</title>\n</head>'); }
     });
   }
 
-  // 9. Multiple <title>
+  // ========== 9. Multiple <title> ==========
   if ((cleaned.match(/<title[^>]*>/gi) || []).length > 1) {
     issues.push({ type: 'multi-title', message: 'يوجد أكثر من وسم <title>.', fix: null });
   }
 
-  // 10. Pure CSS
+  // ========== 10. Pure CSS ==========
   if (!hasTags && /[{;]\s*\n?\s*[a-zA-Z-]+\s*:/.test(cleaned)) {
     issues.push({
       type: 'pure-css',
-      message: 'يبدو أنه كود CSS خالص. سيتم تغليفه بصفحة.',
+      message: 'كود CSS خالص. سيتم تغليفه.',
       fix: function(h) {
         return '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">\n<style>\n' + h + '\n</style></head><body></body></html>';
       }
     });
   }
 
-  // 11. CSS outside <style>
+  // ========== 11. CSS outside <style> ==========
   if (hasTags && /\b[a-zA-Z-]+\s*:\s*[^;]+;/.test(cleaned) && !/<style[^>]*>/i.test(cleaned)) {
     issues.push({
       type: 'css-outside-style',
-      message: 'توجد خواص CSS خارج وسم <style>. ستُنقل إليه.',
+      message: 'توجد خواص CSS خارج <style>.',
       fix: function(h) {
         var cssBlocks = h.match(/\b[a-zA-Z-]+\s*:\s*[^;]+;/g);
         if (cssBlocks) {
@@ -623,44 +616,46 @@ function detectIssues(html) {
     });
   }
 
-  // 12. CSS missing units
+  // ========== 12. CSS missing units (FIXED) ==========
   var unitless = cleaned.match(/:\s*\d+(?![a-zA-Z%])\s*;/g);
   if (unitless && unitless.length) {
     issues.push({
       type: 'css-no-unit',
-      message: 'قيم CSS بدون وحدة (مثل width:100;) تم إضافة px افتراضياً.',
+      message: 'قيم CSS بدون وحدة (مثل width:100;).',
       fix: function(h) {
-        return h.replace(/:\s*(\d+)(?![a-zA-Z%])\s*;/g, ': $1px;');
+        return h.replace(/:\s*(\d+)(?![a-zA-Z%])\s*;/g, function(match, num) {
+          return num === '0' ? match : ': ' + num + 'px;';
+        });
       }
     });
   }
 
-  // 13. @import with http
+  // ========== 13. @import HTTP ==========
   if (/@import\s+url\(["']?http:/.test(cleaned)) {
-    issues.push({ type: 'css-import-http', message: 'يوجد @import برابط http قد يُمنع.', fix: null });
+    issues.push({ type: 'css-import-http', message: 'يوجد @import برابط http.', fix: null });
   }
 
-  // 14. Empty <style>
+  // ========== 14. Empty <style> ==========
   if (/<style[^>]*>\s*<\/style>/gi.test(cleaned)) {
     issues.push({ type: 'empty-style', message: 'هناك وسم <style> فارغ.', fix: null });
   }
 
-  // 15. Pure JS
+  // ========== 15. Pure JS ==========
   if (!hasTags && /\b(function|const|let|var|=>|console\.log|alert|document\.)\b/.test(cleaned)) {
     issues.push({
       type: 'pure-js',
-      message: 'يبدو أنه كود JavaScript خالص. سيتم تغليفه بصفحة.',
+      message: 'كود JavaScript خالص. سيتم تغليفه.',
       fix: function(h) {
         return '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>\n<script>\n' + h + '\n<\/script></body></html>';
       }
     });
   }
 
-  // 16. JS outside <script>
+  // ========== 16. JS outside <script> ==========
   if (hasTags && /\b(function|const|let|var|=>|console\.log)\b/.test(cleaned) && !/<script[^>]*>/i.test(cleaned)) {
     issues.push({
       type: 'js-outside-script',
-      message: 'كود JavaScript مبعثر خارج وسم <script>. ستُنقل إليه.',
+      message: 'كود JavaScript خارج <script>.',
       fix: function(h) {
         var jsPattern = /(?:function\s+\w+\s*\(.*?\)\s*\{[^}]*\}|const\s+\w+\s*=\s*[^;]+;|let\s+\w+\s*=\s*[^;]+;|var\s+\w+\s*=\s*[^;]+;|console\.log\([^)]*\);?)/g;
         var jsCode = h.match(jsPattern);
@@ -673,23 +668,23 @@ function detectIssues(html) {
     });
   }
 
-  // 17. Script src http
+  // ========== 17. Script src http ==========
   if (/<script[^>]+src\s*=\s*["']http:/.test(cleaned)) {
-    issues.push({ type: 'script-src-http', message: 'سكريبت خارجي من رابط http قد يمنع.', fix: null });
+    issues.push({ type: 'script-src-http', message: 'سكريبت خارجي http.', fix: null });
   }
 
-  // 18. document.write
-  if (/document\.write\s*\(/.test(cleaned)) {
+  // ========== 18. document.write (FIXED) ==========
+  if (/^[ \t]*document\.write\s*\(/m.test(cleaned)) {
     issues.push({
       type: 'document-write',
-      message: 'استخدام document.write قد يفشل. سيتم تعطيله (تعليقه).',
+      message: 'استخدام document.write قد يفشل.',
       fix: function(h) {
-        return h.replace(/document\.write/g, '// document.write');
+        return h.replace(/^([ \t]*)document\.write/gm, '$1// document.write');
       }
     });
   }
 
-  // 19. Bracket mismatch in JS
+  // ========== 19. Bracket mismatch (AUTO-FIX for if) ==========
   var jsCode = '';
   var scriptMatches = cleaned.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
   if (scriptMatches) {
@@ -698,15 +693,158 @@ function detectIssues(html) {
     jsCode = cleaned;
   }
   var countChar = function(code, ch) { return (code.match(new RegExp('\\' + ch, 'g')) || []).length; };
-  if (countChar(jsCode, '(') !== countChar(jsCode, ')')) {
-    issues.push({ type: 'js-paren-mismatch', message: 'الأقواس ( ) غير متطابقة في JavaScript.', fix: null });
+  var parenMismatch = countChar(jsCode, '(') !== countChar(jsCode, ')');
+  if (parenMismatch) {
+    // Check for common pattern: if (x > 5 { -> missing )
+    if (/if\s*\([^{]*\{/.test(jsCode)) {
+      issues.push({
+        type: 'js-paren-mismatch',
+        message: 'الأقواس ( ) غير متطابقة (مفقود ) قبل {).',
+        fix: function(h) {
+          return h.replace(/(if\s*\([^{]*) \{/g, '$1) {');
+        }
+      });
+    } else {
+      issues.push({ type: 'js-paren-mismatch', message: 'الأقواس ( ) غير متطابقة.', fix: null });
+    }
   }
   if (countChar(jsCode, '{') !== countChar(jsCode, '}')) {
-    issues.push({ type: 'js-brace-mismatch', message: 'الأقواس { } غير متطابقة في JavaScript.', fix: null });
+    issues.push({ type: 'js-brace-mismatch', message: 'الأقواس { } غير متطابقة.', fix: null });
   }
   if (countChar(jsCode, '[') !== countChar(jsCode, ']')) {
-    issues.push({ type: 'js-bracket-mismatch', message: 'الأقواس [ ] غير متطابقة في JavaScript.', fix: null });
+    issues.push({ type: 'js-bracket-mismatch', message: 'الأقواس [ ] غير متطابقة.', fix: null });
   }
+
+  // ========== 20. console.log (FIXED) ==========
+  if (/console\.log\(/.test(cleaned) && !/id\s*=\s*["']console["']/.test(cleaned)) {
+    issues.push({
+      type: 'console-log',
+      message: 'الكود يستخدم console.log، سيتم إضافة نافذة Console.',
+      fix: function(h) {
+        var consoleDiv = '<div id="console" style="position:fixed;bottom:0;left:0;right:0;height:120px;background:#111;color:#0f0;font-family:monospace;overflow:auto;padding:8px;border-top:1px solid #333;z-index:9999;"></div>';
+        var script = '<script>(function(){var c=document.getElementById("console");if(!c)return;var oldLog=console.log;console.log=function(){var args=Array.prototype.slice.call(arguments);c.innerHTML+=args.join(" ")+"\\n";oldLog.apply(console,args);};window.onerror=function(m,s,l,cl,er){c.innerHTML+="ERROR: "+m+"\\n";};})();<\/script>';
+        if (/<\/body>/i.test(h)) {
+          return h.replace(/<\/body>/i, consoleDiv + script + '</body>');
+        } else {
+          return h + consoleDiv + script;
+        }
+      }
+    });
+  } else if (/console\.log\(/.test(cleaned) && /id\s*=\s*["']console["']/.test(cleaned)) {
+    // Already have console, do nothing
+  }
+
+  // ========== 21. Mismatched HTML tags (FIXED counter) ==========
+  var voidElements = ['br','hr','img','input','meta','link','area','base','col','embed','source','track','wbr'];
+  var tagRegex = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g;
+  var tagCounts = {};
+  var match;
+  while ((match = tagRegex.exec(cleaned)) !== null) {
+    var tagName = match[2].toLowerCase();
+    var isClosing = match[1] === '/';
+    // Ignore void elements and self-closing tags like <div/>
+    if (voidElements.indexOf(tagName) !== -1) continue;
+    var fullTag = match[0];
+    if (/\/\s*>$/.test(fullTag) && !isClosing) {
+      // Self-closing block tag, count as both open and close?
+      // Actually, it's a void-like usage, so skip counting entirely
+      continue;
+    }
+    if (!tagCounts[tagName]) tagCounts[tagName] = { open: 0, close: 0 };
+    if (isClosing) tagCounts[tagName].close++;
+    else tagCounts[tagName].open++;
+  }
+  var mismatched = [];
+  for (var t in tagCounts) {
+    if (tagCounts[t].open !== tagCounts[t].close) {
+      mismatched.push(t + ' (' + tagCounts[t].open + '/' + tagCounts[t].close + ')');
+    }
+  }
+  if (mismatched.length) {
+    issues.push({
+      type: 'tag-mismatch',
+      message: 'وسوم غير متطابقة: ' + mismatched.join(', '),
+      fix: null
+    });
+  }
+
+  // ========== 22. Self-closing block tags (FIXED) ==========
+  if (/<(div|span|p|section|article|nav|header|footer|main|aside)\s[^>]*\/\s*>/gi.test(cleaned)) {
+    issues.push({
+      type: 'self-closing-block',
+      message: 'وسوم بلوك ذاتية الإغلاق (مثل <div/>).',
+      fix: function(h) {
+        return h.replace(/<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*?)\/\s*>/gi, '<$1$2></$1>');
+      }
+    });
+  }
+
+  // ========== 23. Duplicate IDs ==========
+  var ids = cleaned.match(/id\s*=\s*["']([^"']+)["']/gi) || [];
+  var idNames = ids.map(function(x) { return x.replace(/id\s*=\s*["']/i, '').replace(/["']/g, ''); });
+  var duplicates = idNames.filter(function(id, idx) { return idNames.indexOf(id) !== idx; });
+  if (duplicates.length) {
+    issues.push({
+      type: 'duplicate-id',
+      message: 'معرفات id مكررة: ' + duplicates.slice(0,3).join(', '),
+      fix: null
+    });
+  }
+
+  // ========== 24. Img without alt ==========
+  var imgs = cleaned.match(/<img[^>]*>/gi) || [];
+  var noAlt = imgs.filter(function(img) { return !/alt\s*=/i.test(img); });
+  if (noAlt.length) {
+    issues.push({
+      type: 'img-no-alt',
+      message: 'عدد ' + noAlt.length + ' صورة بدون alt.',
+      fix: function(h) {
+        return h.replace(/<img([^>]*)>/gi, function(m, attrs) {
+          if (/alt\s*=/i.test(attrs)) return m;
+          return '<img' + attrs + ' alt="">';
+        });
+      }
+    });
+  }
+
+  // ========== 25. Obsolete tags ==========
+  var obsolete = cleaned.match(/<(center|font|marquee)[\s>]/gi);
+  if (obsolete) {
+    issues.push({
+      type: 'obsolete-tags',
+      message: 'وسوم قديمة: ' + obsolete.join(', '),
+      fix: function(h) {
+        h = h.replace(/<center([\s>])/gi, '<div style="text-align:center"$1').replace(/<\/center>/gi, '</div>');
+        h = h.replace(/<font([\s>])/gi, '<span$1').replace(/<\/font>/gi, '</span>');
+        h = h.replace(/<marquee([\s>])/gi, '<div$1').replace(/<\/marquee>/gi, '</div>');
+        return h;
+      }
+    });
+  }
+
+  // ========== 26. Missing lang ==========
+  if (/<html/i.test(cleaned) && !/<html[^>]*\slang\s*=/i.test(cleaned)) {
+    issues.push({
+      type: 'no-lang',
+      message: 'وسم <html> بدون lang.',
+      fix: function(h) { return h.replace(/<html/i, '<html lang="en"'); }
+    });
+  }
+
+  // ========== 27. Inputs without type ==========
+  if (/<input\s(?!type)/i.test(cleaned) || /<input\s*>/i.test(cleaned)) {
+    issues.push({
+      type: 'input-no-type',
+      message: 'input بدون type.',
+      fix: function(h) {
+        return h.replace(/<input\s/gi, '<input type="text" ')
+                .replace(/<input>/gi, '<input type="text">');
+      }
+    });
+  }
+
+  return issues;
+}
 
   // 20. console.log without visible console
   if (/console\.log\(/.test(cleaned)) {
