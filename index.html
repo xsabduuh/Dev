@@ -134,6 +134,65 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 .toast{position:fixed;bottom:calc(var(--tbh) + 16px);left:50%;transform:translateX(-50%) translateY(10px);background:var(--bg-menu);border:1px solid var(--bhi);border-radius:8px;padding:8px 16px;font-size:13px;color:var(--fg);white-space:nowrap;box-shadow:0 6px 24px rgba(0,0,0,.8);z-index:700;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
+/* Issue Detection Modal */
+.issue-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 950;
+  display: none; align-items: center; justify-content: center;
+}
+.issue-overlay.show { display: flex; }
+.issue-modal {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; width: 90%; max-width: 520px; max-height: 80vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,.9);
+}
+.issue-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  font-weight: 600; font-size: 14px; color: var(--fg);
+}
+.issue-close {
+  background: none; border: none; color: var(--fg2);
+  font-size: 18px; cursor: pointer; padding: 0 4px;
+  transition: color .15s;
+}
+.issue-close:hover { color: var(--red); }
+.issue-body {
+  padding: 16px; overflow-y: auto; flex: 1;
+  color: var(--fg); font-size: 13px; line-height: 1.6;
+}
+.issue-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.issue-item:last-child { border-bottom: none; }
+.issue-icon { color: var(--yel); font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.issue-text { flex: 1; }
+.issue-fix-btn {
+  background: var(--bg-hover); border: 1px solid var(--bhi);
+  color: var(--fg); border-radius: 6px; padding: 4px 10px;
+  font-size: 11px; cursor: pointer; flex-shrink: 0;
+  transition: background .12s, color .12s;
+}
+.issue-fix-btn:hover { background: var(--acc); color: #000; border-color: var(--acc); }
+.issue-empty {
+  text-align: center; padding: 20px; color: var(--green);
+  font-size: 14px;
+}
+.issue-footer {
+  display: flex; gap: 8px; padding: 14px 18px;
+  border-top: 1px solid var(--border); justify-content: flex-end;
+}
+.issue-btn {
+  padding: 8px 18px; border-radius: 8px; font-size: 13px;
+  font-weight: 500; border: none; cursor: pointer;
+  transition: background .12s, opacity .12s;
+}
+.issue-btn.primary { background: var(--acc); color: #000; }
+.issue-btn.primary:hover { background: #d9a8ff; }
+.issue-btn.secondary { background: var(--bg-hover); color: var(--fg); border: 1px solid var(--bhi); }
+.issue-btn.secondary:hover { background: var(--bg-menu); }
+
 /* Scrollbars */
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
@@ -264,12 +323,6 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 </div>
 
 <!-- Preview Overlay -->
-<!--
-  ⚠️ تنبيه أمني:
-  sandbox="allow-scripts allow-same-origin" يسمح بتشغيل السكريبتات والوصول إلى localStorage
-  داخل المعاينة، ولكنه يعرض أيضًا بيانات صفحة المحرر (مثل localStorage و cookies) للخطر
-  إذا كان كود المعاينة غير موثوق. استخدمه بحذر.
--->
 <div class="preview-overlay" id="previewOverlay">
   <button class="preview-close" id="closePreview" title="Close Preview" aria-label="Close preview">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -279,14 +332,27 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
   <iframe class="preview-frame" id="previewFrame" title="Code Preview" sandbox="allow-scripts allow-same-origin"></iframe>
 </div>
 
+<!-- Issue Detection Modal -->
+<div class="issue-overlay" id="issueOverlay">
+  <div class="issue-modal">
+    <div class="issue-header">
+      <span>🔍 تدقيق الكود قبل المعاينة</span>
+      <button class="issue-close" id="issueClose" title="إغلاق">✕</button>
+    </div>
+    <div class="issue-body" id="issueBody">
+      <!-- تُملأ بالمشاكل -->
+    </div>
+    <div class="issue-footer">
+      <button class="issue-btn secondary" id="issuePreviewRaw">معاينة كما هي</button>
+      <button class="issue-btn primary" id="issueFixAll">إصلاح الكل</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
-/* =========================================================
-   ⚠️ تنبيه هام للمطورين والذكاء الاصطناعي ⚠️
-   (نظام الترقية - كما هو)
-   ========================================================= */
 (function(){
 'use strict';
 
@@ -371,6 +437,11 @@ var previewOverlay=document.getElementById('previewOverlay');
 var previewFrame=document.getElementById('previewFrame');
 var closePreview=document.getElementById('closePreview');
 var toastEl=document.getElementById('toast');
+var issueOverlay=document.getElementById('issueOverlay');
+var issueBody=document.getElementById('issueBody');
+var issueClose=document.getElementById('issueClose');
+var issuePreviewRaw=document.getElementById('issuePreviewRaw');
+var issueFixAll=document.getElementById('issueFixAll');
 
 /* ═══════════ TOAST ═══════════ */
 var toastTimer=null;
@@ -388,7 +459,6 @@ function renderLineNums(text){
   for(var i=1;i<=n;i++) h+='<div class="ln">'+i+'</div>';
   lineNums.innerHTML=h;
 }
-// تم إزالة '\n' الزائد الذي كان يسبب عدم تطابق أرقام الأسطر
 function renderHL(text){hlLayer.innerHTML=highlight(text);}
 function updateBtns(){
   undoBtn.disabled=!(undoSt[activeId]&&undoSt[activeId].length>0);
@@ -428,7 +498,6 @@ function renderTabs(){
         btn.appendChild(x);
       }
 
-      // Long press detection with flag
       var pressStartTime = 0;
       var longPressed = false;
 
@@ -443,9 +512,7 @@ function renderTabs(){
         var elapsed = Date.now() - pressStartTime;
         if (elapsed >= 500) {
           longPressed = true;
-          if (f.id === activeId) {
-            startEditTabName(f.id);
-          }
+          if (f.id === activeId) startEditTabName(f.id);
           e.preventDefault();
         } else {
           longPressed = false;
@@ -468,9 +535,7 @@ function renderTabs(){
         var elapsed = Date.now() - pressStartTime;
         if (elapsed >= 500) {
           longPressed = true;
-          if (f.id === activeId) {
-            startEditTabName(f.id);
-          }
+          if (f.id === activeId) startEditTabName(f.id);
         } else {
           longPressed = false;
         }
@@ -489,9 +554,7 @@ function renderTabs(){
           return;
         }
         if (e.target.closest('.tab-x')) return;
-        if (f.id !== activeId) {
-          switchTab(f.id);
-        }
+        if (f.id !== activeId) switchTab(f.id);
       });
 
       tabsBar.appendChild(btn);
@@ -595,9 +658,6 @@ codeArea.addEventListener('scroll',function(){
   lineNums.scrollTop=codeArea.scrollTop;
 });
 
-/* تم إزالة مستمع اللصق الذي كان يسبب قفزة للأعلى ويعيد التسمية تلقائياً */
-/* يمكن إضافة أي سلوك مخصص للصق هنا بدون تغيير التمرير */
-
 codeArea.addEventListener('keydown',function(e){
   if(e.key==='Tab'){
     e.preventDefault();
@@ -630,32 +690,21 @@ tipDismiss.addEventListener('click',function(){copyTip.classList.remove('show');
 document.addEventListener('mousedown',function(e){if(!copyTip.contains(e.target)&&e.target!==selAllBtn)copyTip.classList.remove('show');});
 
 /* ═══════════ DROPDOWN ═══════════ */
-function closeDropdown(){
-  dropdown.classList.remove('show');
-}
-
-menuBtn.addEventListener('click', function(e) {
-  e.stopPropagation();
-  dropdown.classList.toggle('show');
-});
-
+function closeDropdown(){ dropdown.classList.remove('show'); }
+menuBtn.addEventListener('click', function(e) { e.stopPropagation(); dropdown.classList.toggle('show'); });
 function handleOutsideClick(e) {
   if (!dropdown.classList.contains('show')) return;
   if (e.target === menuBtn || menuBtn.contains(e.target)) return;
   if (dropdown.contains(e.target)) return;
   closeDropdown();
 }
-
 document.addEventListener('click', handleOutsideClick);
-document.addEventListener('touchend', function(e) {
-  setTimeout(function() { handleOutsideClick(e); }, 10);
-});
+document.addEventListener('touchend', function(e) { setTimeout(function() { handleOutsideClick(e); }, 10); });
 
 /* ═══════════ PROJECT SAVE ═══════════ */
 var LS_KEY='ce_saves_v1';
 function getSaves(){ try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){return[];} }
 function setSaves(arr){ try{localStorage.setItem(LS_KEY,JSON.stringify(arr));}catch(e){showToast('Storage full!');} }
-
 function doSave(){
   var projectName = prompt('Enter a name for your project:', 'MyProject');
   if (!projectName || !projectName.trim()) { showToast('Save cancelled'); closeDropdown(); return; }
@@ -791,7 +840,6 @@ function buildMultiFilePreview(){
     else if (nameLower.endsWith('.js')) { jsTags += '\n<script>\n' + file.content + '\n<\/script>\n'; }
   }
 
-  // إذا لم يحتوي الملف على <head> أو <body> نضيف هيكل أساسي
   if (!/<head/i.test(htmlContent) && !/<body/i.test(htmlContent)) {
     htmlContent = '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"></head><body>\n' + htmlContent + '\n</body></html>';
   }
@@ -802,24 +850,429 @@ function buildMultiFilePreview(){
   return result;
 }
 
-function openPreview(){
-  var combinedHTML = buildMultiFilePreview();
-  previewFrame.srcdoc = combinedHTML;
+/* ═══════════ ISSUE DETECTION & FIX ═══════════ */
+var detectedIssues = [];
+var previewContentCache = '';
+
+function detectIssues(html) {
+  var issues = [];
+  var cleaned = html;
+
+  // 1. Markdown code fences
+  if (/```/.test(cleaned)) {
+    issues.push({
+      type: 'markdown',
+      message: 'يحتوي على علامات Markdown (```)، قد تمنع العرض الصحيح.',
+      fix: function(h) { return h.replace(/```[\w-]*\s*\n?/g, '').replace(/```/g, ''); }
+    });
+  }
+
+  // 2. Missing <!DOCTYPE html>
+  if (!/<!DOCTYPE\s+html/i.test(cleaned)) {
+    issues.push({
+      type: 'no-doctype',
+      message: 'لا يوجد <!DOCTYPE html>. قد يعمل المتصفح في وضع المراوغات (quirks mode).',
+      fix: function(h) { return '<!DOCTYPE html>\n' + h; }
+    });
+  }
+
+  // 3. Missing <html> tag
+  if (!/<html[\s>]/i.test(cleaned)) {
+    issues.push({
+      type: 'no-html-tag',
+      message: 'لا يوجد وسم <html>. ستتم إضافته.',
+      fix: function(h) { return '<!DOCTYPE html>\n<html>\n' + h + '\n</html>'; }
+    });
+  }
+
+  // 4. Missing <head> and <body> but has other tags
+  var hasTags = /<[a-zA-Z][^>]*>/.test(cleaned);
+  if (hasTags && !/<head[\s>]/i.test(cleaned) && !/<body[\s>]/i.test(cleaned)) {
+    issues.push({
+      type: 'no-head-body',
+      message: 'يحتوي وسوماً HTML لكن بدون <head> أو <body>. سيتم إضافتهما.',
+      fix: function(h) {
+        return h.replace(/(<html[^>]*>)/i, '$1\n<head><meta charset="UTF-8"></head>\n<body>')
+                .replace(/<\/html>/i, '</body>\n</html>');
+      }
+    });
+  }
+
+  // 5. Duplicate structural tags
+  var countTag = function(tag, h) {
+    return (h.match(new RegExp('<' + tag + '[\\s>]', 'gi')) || []).length;
+  };
+  ['html', 'head', 'body'].forEach(function(tag) {
+    if (countTag(tag, cleaned) > 1) {
+      issues.push({
+        type: 'duplicate-' + tag,
+        message: 'يوجد أكثر من وسم <' + tag + '>. قد يسبب سلوكاً غير متوقع.',
+        fix: null
+      });
+    }
+  });
+
+  // 6. Missing <meta charset>
+  if (hasTags && /<head/i.test(cleaned) && !/<meta[^>]*charset/i.test(cleaned)) {
+    issues.push({
+      type: 'no-charset',
+      message: 'لا يوجد <meta charset="UTF-8">. قد تظهر الرموز العربية مشوهة.',
+      fix: function(h) {
+        return h.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">');
+      }
+    });
+  }
+
+  // 7. Missing viewport
+  if (hasTags && /<head/i.test(cleaned) && !/<meta[^>]*name\s*=\s*["']viewport["'][^>]*>/i.test(cleaned)) {
+    issues.push({
+      type: 'no-viewport',
+      message: 'لا يوجد <meta viewport>. التصميم لن يتجاوب على الجوال.',
+      fix: function(h) {
+        return h.replace(/(<head[^>]*>)/i, '$1\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
+      }
+    });
+  }
+
+  // 8. Missing <title>
+  if (hasTags && /<head/i.test(cleaned) && !/<title[^>]*>/i.test(cleaned)) {
+    issues.push({
+      type: 'no-title',
+      message: 'لا يوجد وسم <title> في الرأس.',
+      fix: function(h) {
+        return h.replace(/<\/head>/i, '<title>Preview</title>\n</head>');
+      }
+    });
+  }
+
+  // 9. Multiple <title>
+  if ((cleaned.match(/<title[^>]*>/gi) || []).length > 1) {
+    issues.push({ type: 'multi-title', message: 'يوجد أكثر من وسم <title>.', fix: null });
+  }
+
+  // 10. Pure CSS
+  if (!hasTags && /[{;]\s*\n?\s*[a-zA-Z-]+\s*:/.test(cleaned)) {
+    issues.push({
+      type: 'pure-css',
+      message: 'يبدو أنه كود CSS خالص. سيتم تغليفه بصفحة.',
+      fix: function(h) {
+        return '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">\n<style>\n' + h + '\n</style></head><body></body></html>';
+      }
+    });
+  }
+
+  // 11. CSS outside <style>
+  if (hasTags && /\b[a-zA-Z-]+\s*:\s*[^;]+;/.test(cleaned) && !/<style[^>]*>/i.test(cleaned)) {
+    issues.push({
+      type: 'css-outside-style',
+      message: 'توجد خواص CSS خارج وسم <style>. قد لا تعمل.',
+      fix: function(h) {
+        var cssBlocks = h.match(/\b[a-zA-Z-]+\s*:\s*[^;]+;/g);
+        if (cssBlocks) {
+          var styleTag = '\n<style>\n' + cssBlocks.join('\n') + '\n</style>\n';
+          return h.replace(/(<head[^>]*>)/i, '$1' + styleTag);
+        }
+        return h;
+      }
+    });
+  }
+
+  // 12. CSS missing units
+  var unitless = cleaned.match(/:\s*\d+(?![a-zA-Z%])\s*;/g);
+  if (unitless && unitless.length) {
+    issues.push({
+      type: 'css-no-unit',
+      message: 'قيم CSS بدون وحدة (مثل width:100;). قد لا تعمل. مثال: ' + unitless[0],
+      fix: null
+    });
+  }
+
+  // 13. @import with http
+  if (/@import\s+url\(["']?http:/.test(cleaned)) {
+    issues.push({
+      type: 'css-import-http',
+      message: 'يوجد @import برابط http، وقد يُمنع.',
+      fix: null
+    });
+  }
+
+  // 14. Empty <style>
+  if (/<style[^>]*>\s*<\/style>/gi.test(cleaned)) {
+    issues.push({ type: 'empty-style', message: 'هناك وسم <style> فارغ.', fix: null });
+  }
+
+  // 15. Pure JS
+  if (!hasTags && /\b(function|const|let|var|=>|console\.log|alert|document\.)\b/.test(cleaned)) {
+    issues.push({
+      type: 'pure-js',
+      message: 'يبدو أنه كود JavaScript خالص. سيتم تغليفه بصفحة.',
+      fix: function(h) {
+        return '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>\n<script>\n' + h + '\n<\/script></body></html>';
+      }
+    });
+  }
+
+  // 16. JS outside <script>
+  if (hasTags && /\b(function|const|let|var|=>|console\.log)\b/.test(cleaned) && !/<script[^>]*>/i.test(cleaned)) {
+    issues.push({
+      type: 'js-outside-script',
+      message: 'كود JavaScript مبعثر خارج وسم <script>. قد لا ينفذ.',
+      fix: function(h) {
+        var jsPattern = /(?:function\s+\w+\s*\(.*?\)\s*\{[^}]*\}|const\s+\w+\s*=\s*[^;]+;|let\s+\w+\s*=\s*[^;]+;|var\s+\w+\s*=\s*[^;]+;|console\.log\([^)]*\);?)/g;
+        var jsCode = h.match(jsPattern);
+        if (jsCode) {
+          var scriptTag = '\n<script>\n' + jsCode.join('\n') + '\n<\/script>\n';
+          return h.replace(/<\/body>/i, scriptTag + '</body>');
+        }
+        return h;
+      }
+    });
+  }
+
+  // 17. Script src http
+  if (/<script[^>]+src\s*=\s*["']http:/.test(cleaned)) {
+    issues.push({
+      type: 'script-src-http',
+      message: 'سكريبت خارجي من رابط http قد يمنع.',
+      fix: null
+    });
+  }
+
+  // 18. document.write
+  if (/document\.write\s*\(/.test(cleaned)) {
+    issues.push({
+      type: 'document-write',
+      message: 'استخدام document.write قد يفشل في المعاينة.',
+      fix: null
+    });
+  }
+
+  // 19. Bracket balance in JS
+  var jsCode = '';
+  var scriptMatches = cleaned.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
+  if (scriptMatches) {
+    jsCode = scriptMatches.join('');
+  }
+  var countChar = function(code, ch) { return (code.match(new RegExp('\\' + ch, 'g')) || []).length; };
+  if (countChar(jsCode, '(') !== countChar(jsCode, ')')) {
+    issues.push({ type: 'js-paren-mismatch', message: 'الأقواس ( ) غير متطابقة في JavaScript.', fix: null });
+  }
+  if (countChar(jsCode, '{') !== countChar(jsCode, '}')) {
+    issues.push({ type: 'js-brace-mismatch', message: 'الأقواس { } غير متطابقة في JavaScript.', fix: null });
+  }
+  if (countChar(jsCode, '[') !== countChar(jsCode, ']')) {
+    issues.push({ type: 'js-bracket-mismatch', message: 'الأقواس [ ] غير متطابقة في JavaScript.', fix: null });
+  }
+
+  // 20. console.log without visible console
+  if (/console\.log\(/.test(cleaned)) {
+    issues.push({
+      type: 'console-log',
+      message: 'الكود يستخدم console.log، ولكن لا توجد نافذة Console في المعاينة.',
+      fix: null
+    });
+  }
+
+  // 21. Mismatched HTML tags
+  var tagRegex = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g;
+  var tagCounts = {};
+  var match;
+  while ((match = tagRegex.exec(cleaned)) !== null) {
+    var tagName = match[2].toLowerCase();
+    var isClosing = match[1] === '/';
+    if (['br','hr','img','input','meta','link','area','base','col','embed','source','track','wbr'].indexOf(tagName) !== -1) continue;
+    if (!tagCounts[tagName]) tagCounts[tagName] = { open: 0, close: 0 };
+    if (isClosing) tagCounts[tagName].close++;
+    else tagCounts[tagName].open++;
+  }
+  var mismatched = [];
+  for (var t in tagCounts) {
+    if (tagCounts[t].open !== tagCounts[t].close) {
+      mismatched.push(t + ' (' + tagCounts[t].open + '/' + tagCounts[t].close + ')');
+    }
+  }
+  if (mismatched.length) {
+    issues.push({
+      type: 'tag-mismatch',
+      message: 'وسوم غير متطابقة: ' + mismatched.join(', '),
+      fix: null
+    });
+  }
+
+  // 22. Self-closing block tags
+  if (/<(div|span|p|section|article|nav|header|footer|main|aside)\s[^>]*\/\s*>/gi.test(cleaned)) {
+    issues.push({
+      type: 'self-closing-block',
+      message: 'وسوم بلوك ذاتية الإغلاق (مثل <div/>) قد تفسر بشكل خاطئ.',
+      fix: null
+    });
+  }
+
+  // 23. Duplicate IDs
+  var ids = cleaned.match(/id\s*=\s*["']([^"']+)["']/gi) || [];
+  var idNames = ids.map(function(x) { return x.replace(/id\s*=\s*["']/i, '').replace(/["']/g, ''); });
+  var duplicates = idNames.filter(function(id, idx) { return idNames.indexOf(id) !== idx; });
+  if (duplicates.length) {
+    issues.push({
+      type: 'duplicate-id',
+      message: 'معرفات id مكررة: ' + duplicates.slice(0,3).join(', '),
+      fix: null
+    });
+  }
+
+  // 24. Image without alt
+  var imgs = cleaned.match(/<img[^>]*>/gi) || [];
+  var noAlt = imgs.filter(function(img) { return !/alt\s*=/i.test(img); });
+  if (noAlt.length) {
+    issues.push({
+      type: 'img-no-alt',
+      message: 'عدد ' + noAlt.length + ' صورة بدون سمة alt.',
+      fix: null
+    });
+  }
+
+  // 25. Obsolete tags
+  var obsolete = cleaned.match(/<(center|font|marquee)[\s>]/gi);
+  if (obsolete) {
+    issues.push({
+      type: 'obsolete-tags',
+      message: 'وسوم قديمة غير مدعومة جيداً: ' + obsolete.join(', '),
+      fix: null
+    });
+  }
+
+  // 26. Unescaped entities
+  if (/&(?![a-zA-Z]{2,10};|#\d{1,4};|#x[0-9a-fA-F]+;)/.test(cleaned)) {
+    issues.push({
+      type: 'unescaped-entities',
+      message: 'رموز & غير محولة لكيانات HTML. قد تسبب أخطاء.',
+      fix: null
+    });
+  }
+
+  // 27. Extraneous text outside HTML
+  var textOnly = cleaned.replace(/<[^>]*>/g, '');
+  if (!hasTags && textOnly.trim().length > 0) {
+    // already pure text, not necessarily an issue
+  } else if (textOnly.trim().length > 0 && /[a-zA-Z]{3,}/.test(textOnly)) {
+    issues.push({
+      type: 'extraneous-text',
+      message: 'يوجد نص خارج وسوم HTML قد يكون شرحاً أو بقايا.',
+      fix: null
+    });
+  }
+
+  return issues;
+}
+
+function renderIssueModal(issues, previewContent) {
+  if (!issues.length) {
+    issueBody.innerHTML = '<div class="issue-empty">✅ لا توجد مشاكل، الكود جاهز للمعاينة.</div>';
+    issueFixAll.style.display = 'none';
+    issuePreviewRaw.style.display = 'none';
+    setTimeout(function() {
+      issueOverlay.classList.remove('show');
+      openPreviewWithContent(previewContent);
+    }, 400);
+  } else {
+    var html = '';
+    for (var i = 0; i < issues.length; i++) {
+      var iss = issues[i];
+      html += '<div class="issue-item">';
+      html += '<span class="issue-icon">⚠️</span>';
+      html += '<span class="issue-text">' + iss.message + '</span>';
+      if (iss.fix) {
+        html += '<button class="issue-fix-btn" data-issue-idx="' + i + '">إصلاح</button>';
+      } else {
+        html += '<span style="color: var(--fg3); font-size:11px;">يدوي</span>';
+      }
+      html += '</div>';
+    }
+    issueBody.innerHTML = html;
+    issueFixAll.style.display = 'inline-block';
+    issuePreviewRaw.style.display = 'inline-block';
+
+    var fixBtns = issueBody.querySelectorAll('.issue-fix-btn');
+    for (var b = 0; b < fixBtns.length; b++) {
+      fixBtns[b].addEventListener('click', function(e) {
+        var idx = parseInt(this.getAttribute('data-issue-idx'));
+        var issue = detectedIssues[idx];
+        if (issue && issue.fix) {
+          previewContentCache = issue.fix(previewContentCache);
+          detectedIssues = detectIssues(previewContentCache);
+          renderIssueModal(detectedIssues, previewContentCache);
+        }
+      });
+    }
+  }
+}
+
+function openPreviewWithContent(content) {
+  previewFrame.srcdoc = content;
   previewOverlay.classList.add('show');
 }
-function closePreviewFn(){
-  previewOverlay.classList.remove('show');
-  previewFrame.srcdoc = '';
-}
-playBtn.addEventListener('click', openPreview);
-closePreview.addEventListener('click', closePreviewFn);
-previewOverlay.addEventListener('click', function(e){ if(e.target === previewOverlay) closePreviewFn(); });
 
+function handlePlayClick() {
+  var combined = buildMultiFilePreview();
+  previewContentCache = combined;
+  detectedIssues = detectIssues(combined);
+
+  if (detectedIssues.length === 0) {
+    openPreviewWithContent(combined);
+  } else {
+    renderIssueModal(detectedIssues, combined);
+    issueOverlay.classList.add('show');
+  }
+}
+playBtn.addEventListener('click', handlePlayClick);
+
+issueClose.addEventListener('click', function() {
+  issueOverlay.classList.remove('show');
+});
+issuePreviewRaw.addEventListener('click', function() {
+  issueOverlay.classList.remove('show');
+  openPreviewWithContent(previewContentCache);
+});
+issueFixAll.addEventListener('click', function() {
+  for (var i = 0; i < detectedIssues.length; i++) {
+    if (detectedIssues[i].fix) {
+      previewContentCache = detectedIssues[i].fix(previewContentCache);
+    }
+  }
+  detectedIssues = detectIssues(previewContentCache);
+  if (detectedIssues.length === 0) {
+    issueOverlay.classList.remove('show');
+    openPreviewWithContent(previewContentCache);
+  } else {
+    renderIssueModal(detectedIssues, previewContentCache);
+  }
+});
+issueOverlay.addEventListener('click', function(e) {
+  if (e.target === issueOverlay) {
+    issueOverlay.classList.remove('show');
+  }
+});
+
+/* ═══════════ ESCAPE KEY HANDLING ═══════════ */
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
-    if(savesPanel.classList.contains('show')){ savesPanel.classList.remove('show'); return; }
-    if(previewOverlay.classList.contains('show')){ closePreviewFn(); return; }
-    if(editingTabId !== null){ cancelRename(); return; }
+    if(issueOverlay.classList.contains('show')){
+      issueOverlay.classList.remove('show');
+      return;
+    }
+    if(savesPanel.classList.contains('show')){
+      savesPanel.classList.remove('show');
+      return;
+    }
+    if(previewOverlay.classList.contains('show')){
+      previewOverlay.classList.remove('show');
+      previewFrame.srcdoc = '';
+      return;
+    }
+    if(editingTabId !== null){
+      cancelRename();
+      return;
+    }
     closeDropdown();
   }
 });
