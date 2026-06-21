@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Code Editor – Preview Fix</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="shell">
+  <header class="header">
+    <div class="h-side l"></div>
+    <span class="h-title">Editor</span>
+    <div class="h-side r">
+      <button class="play-btn" id="playBtn" title="Preview" aria-label="Preview">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="tabs-bar" id="tabsBar"></div>
+
+  <div class="editor-wrap">
+    <div class="line-nums" id="lineNums"></div>
+    <div class="editor-inner">
+      <div class="hl-layer" id="hlLayer" aria-hidden="true"></div>
+      <textarea class="code-area" id="codeArea" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="Code Editor" role="textbox" aria-multiline="true"></textarea>
+    </div>
+  </div>
+
+  <footer class="toolbar">
+    <div class="tb-inner">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button class="ic-btn" id="undoBtn" title="Undo" disabled aria-label="Undo">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+          </svg>
+        </button>
+
+        <div class="sel-wrap">
+          <button class="ic-btn" id="selAllBtn" title="Select All" aria-label="Select All">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+            </svg>
+          </button>
+          <div class="copy-tip" id="copyTip">
+            <button class="copy-btn2" id="copyBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>Copy
+            </button>
+            <button class="tip-dismiss" id="tipDismiss">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button class="ic-btn" id="redoBtn" title="Redo" disabled aria-label="Redo">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/>
+          </svg>
+        </button>
+
+        <div class="menu-wrap">
+          <button class="ic-btn" id="menuBtn" title="Options" aria-label="Options">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
+            </svg>
+          </button>
+          <div class="dropdown" id="dropdown">
+            <button class="dd-item" id="saveBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>Save Project
+            </button>
+            <button class="dd-item danger" id="deleteBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>Delete Code
+            </button>
+            <button class="dd-item" id="renameBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>Rename
+            </button>
+            <div class="dd-sep"></div>
+            <button class="dd-item" id="addFileBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>Add New File
+            </button>
+            <div class="dd-sep"></div>
+            <button class="dd-item" id="openSavesBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>Saved Files
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<!-- Saved Files Panel -->
+<div class="saves-panel" id="savesPanel">
+  <div class="saves-hd">
+    <span class="saves-title">Saved Files</span>
+    <button class="saves-close" id="savesClose" aria-label="Close saved files">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+  <div class="saves-list" id="savesList"></div>
+</div>
+
+<!-- Preview Overlay -->
+<div class="preview-overlay" id="previewOverlay">
+  <button class="preview-close" id="closePreview" title="Close Preview" aria-label="Close preview">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </button>
+  <iframe class="preview-frame" id="previewFrame" title="Code Preview" sandbox="allow-scripts allow-same-origin"></iframe>
+</div>
+
+<!-- Issue Detection Modal -->
+<div class="issue-overlay" id="issueOverlay">
+  <div class="issue-modal">
+    <div class="issue-header">
+      <span>🔍 تدقيق الكود قبل المعاينة</span>
+      <button class="issue-close" id="issueClose" title="إغلاق">✕</button>
+    </div>
+    <div class="issue-body" id="issueBody"></div>
+    <div class="issue-footer">
+      <button class="issue-btn secondary" id="issuePreviewRaw">معاينة كما هي</button>
+      <button class="issue-btn primary" id="issueFixAll">إصلاح الكل</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
