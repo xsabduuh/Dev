@@ -894,19 +894,11 @@ function detectIssues(html) {
   }
 
   // 2. Check for Markdown fences
-  if (/
-    
-```/.test(html)) {
+  if (/```/.test(html)) {
     issues.push({
       type: 'markdown',
-      message: 'يحتوي على علامات Markdown (
-```)',
-
-      fix: function(h) { return h.replace(/
-      
-```[\w-]*\s*\n?/g, '').replace(/
-
-```/g, ''); }
+      message: 'يحتوي على علامات Markdown (```)',
+      fix: function(h) { return h.replace(/```[\w-]*\s*\n?/g, '').replace(/```/g, ''); }
     });
   }
 
