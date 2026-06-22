@@ -169,7 +169,7 @@ function renderTabs(){
   }
 }
 
-/* ═══════════ TABS (improved switchTab & closeTab) ═══════════ */
+/* ═══════════ TABS (unchanged) ═══════════ */
 function switchTab(id){
   commitUndo();
   activeId=id;
@@ -240,7 +240,7 @@ function doRedo(){
   applyContent(next);lastCommit=next;
 }
 
-/* ═══════════ TEXTAREA EVENTS (with real-time validation) ═══════════ */
+/* ═══════════ TEXTAREA EVENTS (unchanged) ═══════════ */
 codeArea.addEventListener('input',function(){
   var val=codeArea.value;
   for(var k=0;k<files.length;k++)if(files[k].id===activeId){files[k].content=val;break;}
@@ -445,7 +445,7 @@ function buildMultiFilePreviewWithFixes(fixedContents) {
   return result;
 }
 
-/* ═══════════ DIAGNOSTIC SYSTEM ═══════════ */
+/* ═══════════ DIAGNOSTIC SYSTEM (REWRITTEN & STABILIZED) ═══════════ */
 var Diagnostic = (function(){
   var counter = 0;
   function getId(prefix, fileId, line, col) {
@@ -483,135 +483,58 @@ function getLineCol(text, offset) {
   return {line: line, col: col};
 }
 
-/* ═══════════ EXTRACTORS (IMPROVED & SIMPLIFIED) ═══════════ */
+/* ═══════════ EXTRACTORS (SIMPLIFIED & SAFE) ═══════════ */
 var Extractors = {
   html: function(code, fileId, fileName) {
     var doc;
     try { doc = (new DOMParser()).parseFromString(code, 'text/html'); } catch(e) { return { doc: null, styles: [], scripts: [] }; }
     var styles = [], scripts = [];
 
-    function findTagRanges(tagName) {
-      var results = [];
-      var codeLower = code.toLowerCase();
-      var openTag = '<' + tagName.toLowerCase();
-      var closeTag = '</' + tagName.toLowerCase() + '>';
-      var i = 0;
-      while (i < codeLower.length) {
-        var openIdx = codeLower.indexOf(openTag, i);
-        if (openIdx === -1) break;
-        var tagEnd = codeLower.indexOf('>', openIdx);
-        if (tagEnd === -1) break;
-        var attrs = code.substring(openIdx + openTag.length, tagEnd).trim();
-        var depth = 1;
-        var searchPos = tagEnd + 1;
-        var contentStart = tagEnd + 1;
-        var foundClose = false;
-        while (depth > 0) {
-          var nextOpenIdx = codeLower.indexOf(openTag, searchPos);
-          var closeIdx = codeLower.indexOf(closeTag, searchPos);
-          if (closeIdx === -1) break;
-          if (nextOpenIdx !== -1 && nextOpenIdx < closeIdx) {
-            depth++;
-            var nestedTagEnd = codeLower.indexOf('>', nextOpenIdx);
-            if (nestedTagEnd === -1) break;
-            searchPos = nestedTagEnd + 1;
-          } else {
-            depth--;
-            if (depth === 0) {
-              var content = code.substring(contentStart, closeIdx);
-              results.push({ start: openIdx, end: closeIdx + closeTag.length, content: content, attrs: attrs });
-              i = closeIdx + closeTag.length;
-              foundClose = true;
-            } else { searchPos = closeIdx + closeTag.length; }
-          }
-        }
-        if (!foundClose) { i = tagEnd + 1; }
-      }
-      return results;
-    }
-
-    var styleRanges = findTagRanges('style');
-    styleRanges.forEach(function(r) {
-      var rs = getLineCol(code, r.start), re = getLineCol(code, r.end);
-      styles.push({ type:'style', content: r.content, range: { startLine: rs.line, startCol: rs.col, endLine: re.line, endCol: re.col } });
+    // Extract Styles safely
+    var styleTags = doc.querySelectorAll('style');
+    styleTags.forEach(function(tag) {
+      var content = tag.textContent;
+      var idx = code.indexOf(content);
+      var rs = idx >= 0 ? getLineCol(code, idx) : {line:1, col:1};
+      var re = idx >= 0 ? getLineCol(code, idx + content.length) : {line:1, col:1};
+      styles.push({ type:'style', content: content, range: { startLine: rs.line, startCol: rs.col, endLine: re.line, endCol: re.col } });
     });
 
-    var scriptRanges = findTagRanges('script');
-    scriptRanges.forEach(function(r) {
-      var isModule = /type\s*=\s*["']module["']/i.test(r.attrs);
-      var rs = getLineCol(code, r.start), re = getLineCol(code, r.end);
-      scripts.push({ type: isModule?'module':'script', content: r.content, range: { startLine: rs.line, startCol: rs.col, endLine: re.line, endCol: re.col } });
+    // Extract Scripts safely
+    var scriptTags = doc.querySelectorAll('script');
+    scriptTags.forEach(function(tag) {
+      var content = tag.textContent;
+      if(!content.trim()) return;
+      var isModule = tag.type === 'module';
+      var idx = code.indexOf(content);
+      var rs = idx >= 0 ? getLineCol(code, idx) : {line:1, col:1};
+      var re = idx >= 0 ? getLineCol(code, idx + content.length) : {line:1, col:1};
+      scripts.push({ type: isModule?'module':'script', content: content, range: { startLine: rs.line, startCol: rs.col, endLine: re.line, endCol: re.col } });
     });
 
     return { doc: doc, styles: styles, scripts: scripts };
   }
 };
 
-/* ═══════════ VALIDATORS (Rules) ═══════════ */
+/* ═══════════ VALIDATORS (Rules - TUNED) ═══════════ */
 var rules = [];
 function registerRule(rule) { rules.push(rule); }
+
+// Check if browser supports constructible stylesheets
+var supportsCSSSyntaxCheck = ('CSSStyleSheet' in window && 'replaceSync' in CSSStyleSheet.prototype);
 
 registerRule({
   id: 'HTML-STRUCTURE',
   validate: function(file, code, extracted) {
     var diags = [], doc = extracted.doc;
-    if (!doc) return diags;
-    if (!doc.doctype) diags.push(new Diagnostic('warning','HTML-0001','Missing DOCTYPE declaration.','html-structure',file.id,file.name,1,1,1,1,{type:'prepend',value:'<!DOCTYPE html>\n',mode:'auto'}));
-    if (!doc.documentElement.hasAttribute('lang')) diags.push(new Diagnostic('warning','HTML-0002','Missing lang attribute on <html>.','html-structure',file.id,file.name,1,1,1,1,null));
+    if (!doc || !code.trim()) return diags;
+    // Changed to 'info' so it doesn't overwhelm the user while typing simple snippets
+    if (!doc.doctype) diags.push(new Diagnostic('info','HTML-0001','Missing DOCTYPE declaration.','html-structure',file.id,file.name,1,1,1,1,{type:'prepend',value:'<!DOCTYPE html>\n',mode:'auto'}));
+    if (!doc.documentElement.hasAttribute('lang')) diags.push(new Diagnostic('info','HTML-0002','Missing lang attribute on <html>.','html-structure',file.id,file.name,1,1,1,1,null));
     var head = doc.head;
-    if (!head || !head.querySelector('meta[charset]')) diags.push(new Diagnostic('warning','HTML-0003','Missing <meta charset="UTF-8">.','html-structure',file.id,file.name,1,1,1,1,null));
-    if (!head || !head.querySelector('meta[name="viewport"]')) diags.push(new Diagnostic('warning','HTML-0004','Missing viewport meta tag.','html-structure',file.id,file.name,1,1,1,1,null));
-    if (!head || !head.querySelector('title')) diags.push(new Diagnostic('warning','HTML-0005','Missing <title> in <head>.','html-structure',file.id,file.name,1,1,1,1,null));
-    return diags;
-  }
-});
-
-registerRule({
-  id: 'OBSOLETE-TAGS',
-  validate: function(file, code, extracted) {
-    var diags = [], doc = extracted.doc;
-    if (!doc) return diags;
-    ['center','font','marquee'].forEach(function(tag) {
-      doc.querySelectorAll(tag).forEach(function(el) {
-        var html = el.outerHTML, idx = code.indexOf(html);
-        var lc = idx >= 0 ? getLineCol(code, idx) : {line:1,col:1};
-        diags.push(new Diagnostic('warning','HTML-0010','Obsolete tag <'+tag+'> used.','html-obsolete',file.id,file.name,lc.line,lc.col,lc.line,lc.col+html.length,null));
-      });
-    });
-    return diags;
-  }
-});
-
-registerRule({
-  id: 'IMG-ALT',
-  validate: function(file, code, extracted) {
-    var diags = [], doc = extracted.doc;
-    if (!doc) return diags;
-    doc.querySelectorAll('img:not([alt])').forEach(function(img) {
-      var html = img.outerHTML, idx = code.indexOf(html);
-      var lc = idx >= 0 ? getLineCol(code, idx) : {line:1,col:1};
-      diags.push(new Diagnostic('warning','HTML-0011','Image missing alt attribute.','html-accessibility',file.id,file.name,lc.line,lc.col,lc.line,lc.col+html.length,null));
-    });
-    return diags;
-  }
-});
-
-registerRule({
-  id: 'DOC-WRITE',
-  validate: function(file, code, extracted) {
-    var diags = [], segments = [];
-    if (extracted.doc) {
-      extracted.scripts.forEach(function(s) { segments.push({code:s.content, startLine:s.range.startLine, startCol:s.range.startColumn}); });
-    } else if (/\.js$/i.test(file.name)) segments.push({code:code, startLine:1, startCol:1});
-    segments.forEach(function(seg) {
-      var lines = seg.code.split('\n');
-      for (var i=0;i<lines.length;i++) {
-        if (lines[i].includes('document.write')) {
-          var line = seg.startLine + i, col = lines[i].indexOf('document.write')+1;
-          diags.push(new Diagnostic('warning','JS-0001','Avoid using document.write().','js-best-practice',file.id,file.name,line,col,line,col+'document.write'.length,null));
-        }
-      }
-    });
+    if (!head || !head.querySelector('meta[charset]')) diags.push(new Diagnostic('info','HTML-0003','Missing <meta charset="UTF-8">.','html-structure',file.id,file.name,1,1,1,1,null));
+    if (!head || !head.querySelector('meta[name="viewport"]')) diags.push(new Diagnostic('info','HTML-0004','Missing viewport meta tag.','html-structure',file.id,file.name,1,1,1,1,null));
+    if (!head || !head.querySelector('title')) diags.push(new Diagnostic('info','HTML-0005','Missing <title> in <head>.','html-structure',file.id,file.name,1,1,1,1,null));
     return diags;
   }
 });
@@ -620,15 +543,25 @@ registerRule({
   id: 'CSS-SYNTAX',
   validate: function(file, code, extracted) {
     var diags = [], segments = [];
+    if (!supportsCSSSyntaxCheck) return diags; // Skip if not supported to prevent crashes
+    
     if (extracted.doc) {
       extracted.styles.forEach(function(s) { segments.push({code:s.content, startLine:s.range.startLine, startCol:s.range.startColumn}); });
     } else if (/\.css$/i.test(file.name)) segments.push({code:code, startLine:1, startCol:1});
+    
     segments.forEach(function(seg) {
-      try { (new CSSStyleSheet()).replaceSync(seg.code); } catch(e) {
+      if(!seg.code.trim()) return;
+      try { 
+        var sheet = new CSSStyleSheet();
+        sheet.replaceSync(seg.code); 
+      } catch(e) {
+        // Ignore incomplete typing errors
+        if (e.message.includes("Unexpected end of input") || e.message.includes("Expected")) return;
+        
         var line = seg.startLine, col = seg.startCol;
         var m = e.message.match(/\((\d+):(\d+)\)/);
         if (m) { line = seg.startLine + parseInt(m[1],10)-1; col = seg.startCol + parseInt(m[2],10)-1; }
-        diags.push(new Diagnostic('error','CSS-0001','CSS syntax error: '+e.message,'css-syntax',file.id,file.name,line,col,line,col,null));
+        diags.push(new Diagnostic('error','CSS-0001','CSS syntax error.','css-syntax',file.id,file.name,line,col,line,col,null));
       }
     });
     return diags;
@@ -642,50 +575,28 @@ registerRule({
     if (extracted.doc) {
       extracted.scripts.forEach(function(s) { segments.push({code:s.content, type:s.type, startLine:s.range.startLine, startCol:s.range.startColumn}); });
     } else if (/\.js$/i.test(file.name)) segments.push({code:code, type:'script', startLine:1, startCol:1});
+    
     segments.forEach(function(seg) {
-      var jsCode = seg.code.trim(); if (!jsCode) return;
-      var testCode = seg.type === 'module' ? jsCode.replace(/^(import|export)\s/gm, '//$&') : jsCode;
-      try { new Function('"use strict";\n' + testCode); } catch(e) {
+      var jsCode = seg.code.trim(); 
+      if (!jsCode) return;
+      
+      // Better regex to comment out imports/exports without breaking syntax
+      var testCode = jsCode.replace(/(^|\n)\s*(import|export)\b/g, '$1//$2');
+      
+      try { 
+        new Function('"use strict";\n' + testCode); 
+      } catch(e) {
+        // Ignore errors caused by incomplete typing or module syntax that slipped through
+        if (e.message.includes("Unexpected end of input")) return;
+        if (e.message.includes("Cannot use import statement") || e.message.includes("Unexpected token 'export'")) return;
+        
         var line = seg.startLine, col = seg.startCol;
         if (e.lineNumber) line = seg.startLine + e.lineNumber - 1;
         else if (e.line) line = seg.startLine + e.line - 1;
-        diags.push(new Diagnostic('error','JS-0002','JavaScript syntax error: '+e.message,'js-syntax',file.id,file.name,line,col,line,col,null));
+        
+        diags.push(new Diagnostic('error','JS-0002','JavaScript syntax error: ' + e.message,'js-syntax',file.id,file.name,line,col,line,col,null));
       }
     });
-    return diags;
-  }
-});
-
-registerRule({
-  id: 'SELF-CLOSING-BLOCK',
-  validate: function(file, code, extracted) {
-    var diags = [];
-    if (!extracted.doc) return diags;
-    var pattern = /<(div|span|p|section|article|nav|header|footer|main|aside)(\s[^>]*)?\/\s*>/gi, match;
-    while ((match = pattern.exec(code)) !== null) {
-      var full = match[0], tag = match[1], idx = match.index;
-      var lc = getLineCol(code, idx);
-      var replacement = '<' + tag + (match[2] || '') + '></' + tag + '>';
-      diags.push(new Diagnostic('warning','HTML-0020','Self-closing block tag <'+tag+'/> is invalid.','html-validity',file.id,file.name,lc.line,lc.col,lc.line,lc.col+full.length,
-        {type:'replace',start:idx,end:idx+full.length,replacement:replacement,mode:'quick'}
-      ));
-    }
-    return diags;
-  }
-});
-
-registerRule({
-  id: 'MARKDOWN-FENCES',
-  validate: function(file, code, extracted) {
-    var diags = [];
-    if (!code.includes('```')) return diags;
-    var lines = code.split('\n');
-    for (var i=0;i<lines.length;i++) {
-      if (/^\s*```/.test(lines[i])) {
-        diags.push(new Diagnostic('warning','GEN-0001','Markdown code fences detected. Remove them for clean code.','markdown',file.id,file.name,i+1,1,i+1,lines[i].length+1,null));
-        break;
-      }
-    }
     return diags;
   }
 });
@@ -707,7 +618,7 @@ var FixRegistry = {
   }
 };
 
-/* ═══════════ REAL-TIME VALIDATION (with cache) ═══════════ */
+/* ═══════════ REAL-TIME VALIDATION (with cache & longer debounce) ═══════════ */
 var lastDiagnostics = [];
 var applySafeFixesBeforePreview = false;
 var currentFilter = 'all';
@@ -728,6 +639,7 @@ function analyzeSingleFile(file) {
 var realTimeValidationTimer = null;
 function scheduleRealTimeValidation() {
   clearTimeout(realTimeValidationTimer);
+  // Increased debounce to 1200ms to prevent flashing errors while typing
   realTimeValidationTimer = setTimeout(function() {
     var file = getFile(); if (!file) return;
     var cacheEntry = _analysisCache[file.id];
@@ -737,7 +649,7 @@ function scheduleRealTimeValidation() {
     lastDiagnostics = lastDiagnostics.filter(function(d) { return d.fileId !== file.id; }).concat(diags);
     if (issueOverlay && issueOverlay.classList.contains('show')) renderProblemsPanel(currentFilter);
     updateProblemsBadge();
-  }, 800);
+  }, 1200);
 }
 
 function analyzeAllFiles(applyAutoFixes) {
@@ -792,11 +704,23 @@ safeFixBtn.addEventListener('click', function() {
 });
 if (problemsBtn && problemsBtn.parentNode) problemsBtn.parentNode.insertBefore(safeFixBtn, problemsBtn);
 
+// CRASH FIX: Create issueOverlay if it doesn't exist in HTML
 var issueOverlay = document.getElementById('issueOverlay');
-// We'll dynamically populate it depending on context.
+if (!issueOverlay) {
+  issueOverlay = document.createElement('div');
+  issueOverlay.id = 'issueOverlay';
+  issueOverlay.className = 'overlay'; // Use your existing overlay class if you have one
+  issueOverlay.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center;';
+  document.body.appendChild(issueOverlay);
+  
+  // Add a small CSS rule to handle the 'show' class dynamically
+  var style = document.createElement('style');
+  style.innerHTML = '#issueOverlay.show { display:flex !important; }';
+  document.head.appendChild(style);
+}
 
 function renderProblemsPanel(filter) {
-  if (!issueOverlay || !issueOverlay.classList.contains('show')) return; // only if visible
+  if (!issueOverlay || !issueOverlay.classList.contains('show')) return;
   var list = document.getElementById('issuesList');
   if (!list) return;
   filter = filter || 'all';
@@ -861,13 +785,11 @@ function showPlayIssuesModal(diagnostics, fixedContents) {
   var errs = diagnostics.filter(function(d) { return d.severity==='error'; }).length;
   var warns = diagnostics.filter(function(d) { return d.severity==='warning'; }).length;
   if (errs===0 && warns===0) {
-    // No issues, open preview directly
     var combined = buildMultiFilePreviewWithFixes(fixedContents);
     previewFrame.srcdoc = combined;
     previewOverlay.classList.add('show');
     return;
   }
-  // Build modal
   var listHtml = '';
   diagnostics.forEach(function(d) {
     var icon = d.severity==='error'?'🔴':(d.severity==='warning'?'🟡':'🔵');
@@ -888,7 +810,6 @@ function showPlayIssuesModal(diagnostics, fixedContents) {
 
   document.getElementById('playIssueClose').addEventListener('click', function() { issueOverlay.classList.remove('show'); });
   document.getElementById('playFixAllAuto').addEventListener('click', function() {
-    // Apply auto fixes to all files
     var filesMap = {}; files.forEach(function(f){ filesMap[f.id]=f; });
     var changedActive = false;
     diagnostics.filter(function(d) { return d.fix && d.fix.mode==='auto'; }).forEach(function(d) {
@@ -903,10 +824,8 @@ function showPlayIssuesModal(diagnostics, fixedContents) {
       lastCommit = af.content;
       renderTabs(); renderEditor();
     }
-    // Re-analyze
     var newResult = analyzeAllFiles(applySafeFixesBeforePreview);
     issueOverlay.classList.remove('show');
-    // Show updated modal if still issues
     showPlayIssuesModal(newResult.diagnostics, newResult.fixedContents);
   });
   document.getElementById('playPreviewRaw').addEventListener('click', function() {
@@ -931,7 +850,6 @@ problemsBtn.addEventListener('click', function() {
     issueOverlay.classList.remove('show');
     return;
   }
-  // Build manual panel structure
   issueOverlay.innerHTML =
     '<div class="saves-panel-inner" style="max-width:700px;">'
     +'<div class="saves-header"><h3>Problems</h3><button id="fixAllAutoBtn" style="margin-right:8px;font-size:12px;background:var(--acc);border:none;color:white;padding:4px 12px;border-radius:4px;cursor:pointer;">Fix All Auto</button><button id="issueClose" class="saves-close">&times;</button></div>'
@@ -1011,3 +929,4 @@ renderTabs();
 renderEditor();
 
 })();
+
