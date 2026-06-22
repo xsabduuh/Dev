@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Code Editor – Professional Linter</title>
+<title>Code Editor</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 :root{
@@ -122,69 +122,6 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
 
 .toast{position:fixed;bottom:calc(var(--tbh) + 16px);left:50%;transform:translateX(-50%) translateY(10px);background:var(--bg-menu);border:1px solid var(--bhi);border-radius:8px;padding:8px 16px;font-size:13px;color:var(--fg);white-space:nowrap;box-shadow:0 6px 24px rgba(0,0,0,.8);z-index:700;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-
-.issue-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 950;
-  display: none; align-items: center; justify-content: center;
-}
-.issue-overlay.show { display: flex; }
-.issue-modal {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 12px; width: 90%; max-width: 600px; max-height: 85vh;
-  display: flex; flex-direction: column; overflow: hidden;
-  box-shadow: 0 12px 40px rgba(0,0,0,.9);
-}
-.issue-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 18px; border-bottom: 1px solid var(--border);
-  font-weight: 600; font-size: 14px; color: var(--fg);
-}
-.issue-close {
-  background: none; border: none; color: var(--fg2);
-  font-size: 18px; cursor: pointer; padding: 0 4px;
-  transition: color .15s;
-}
-.issue-close:hover { color: var(--red); }
-.issue-body {
-  padding: 16px; overflow-y: auto; flex: 1;
-  color: var(--fg); font-size: 13px; line-height: 1.6;
-}
-.issue-item {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.05);
-}
-.issue-item:last-child { border-bottom: none; }
-.issue-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-.issue-icon.error { color: var(--red); }
-.issue-icon.warning { color: var(--yel); }
-.issue-icon.info { color: var(--blue); }
-.issue-text { flex: 1; }
-.issue-title { font-weight: 600; margin-bottom: 4px; }
-.issue-desc { color: var(--fg2); font-size: 12px; }
-.issue-fix-btn {
-  background: var(--acc); border: none;
-  color: #000; border-radius: 6px; padding: 6px 12px;
-  font-size: 11px; font-weight: 600; cursor: pointer; flex-shrink: 0;
-  transition: background .12s;
-}
-.issue-fix-btn:hover { background: #d9a8ff; }
-.issue-empty {
-  text-align: center; padding: 30px; color: var(--green);
-  font-size: 15px; font-weight: 600;
-}
-.issue-footer {
-  display: flex; gap: 8px; padding: 14px 18px;
-  border-top: 1px solid var(--border); justify-content: flex-end;
-}
-.issue-btn {
-  padding: 10px 20px; border-radius: 8px; font-size: 13px;
-  font-weight: 600; border: none; cursor: pointer;
-  transition: background .12s, opacity .12s;
-}
-.issue-btn.primary { background: var(--acc); color: #000; }
-.issue-btn.primary:hover { background: #d9a8ff; }
-.issue-btn.secondary { background: var(--bg-hover); color: var(--fg); border: 1px solid var(--bhi); }
-.issue-btn.secondary:hover { background: var(--bg-menu); }
 
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
@@ -322,20 +259,6 @@ button{cursor:pointer;font-family:inherit;-webkit-user-select:none;user-select:n
   <iframe class="preview-frame" id="previewFrame" title="Code Preview" sandbox="allow-scripts allow-same-origin"></iframe>
 </div>
 
-<div class="issue-overlay" id="issueOverlay">
-  <div class="issue-modal">
-    <div class="issue-header">
-      <span>🔍 تدقيق الكود</span>
-      <button class="issue-close" id="issueClose" title="إغلاق">✕</button>
-    </div>
-    <div class="issue-body" id="issueBody"></div>
-    <div class="issue-footer">
-      <button class="issue-btn secondary" id="issuePreviewRaw">معاينة كما هي</button>
-      <button class="issue-btn primary" id="issueFixAll">إصلاح الكل تلقائياً</button>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
 <script>
@@ -418,11 +341,6 @@ var previewOverlay=document.getElementById('previewOverlay');
 var previewFrame=document.getElementById('previewFrame');
 var closePreviewBtn=document.getElementById('closePreview');
 var toastEl=document.getElementById('toast');
-var issueOverlay=document.getElementById('issueOverlay');
-var issueBody=document.getElementById('issueBody');
-var issueCloseBtn=document.getElementById('issueClose');
-var issuePreviewRaw=document.getElementById('issuePreviewRaw');
-var issueFixAll=document.getElementById('issueFixAll');
 
 var toastTimer=null;
 function showToast(msg){
@@ -560,25 +478,17 @@ function closeTab(id){
   renderTabs();renderEditor();
 }
 
-function startEditTabName(id){
-  editingTabId = id;
-  renderTabs();
-}
+function startEditTabName(id){ editingTabId = id; renderTabs(); }
 function finishRename(newName, id){
   if(editingTabId !== id) return;
   newName = (newName || '').trim();
   if(newName){
-    for(var k=0;k<files.length;k++){
-      if(files[k].id === id){ files[k].name = newName; break; }
-    }
+    for(var k=0;k<files.length;k++){ if(files[k].id === id){ files[k].name = newName; break; } }
   }
   editingTabId = null;
   renderTabs();
 }
-function cancelRename(){
-  editingTabId = null;
-  renderTabs();
-}
+function cancelRename(){ editingTabId = null; renderTabs(); }
 
 function initSt(id){if(!undoSt[id])undoSt[id]=[];if(!redoSt[id])redoSt[id]=[];}
 function pushUndo(snap){
@@ -591,10 +501,7 @@ function pushUndo(snap){
 function commitUndo(){
   clearTimeout(undoTimer);
   var cur=codeArea.value;
-  if(cur !== lastCommit){
-    pushUndo(lastCommit);
-    lastCommit = cur;
-  }
+  if(cur !== lastCommit){ pushUndo(lastCommit); lastCommit = cur; }
 }
 function applyContent(val){
   for(var k=0;k<files.length;k++)if(files[k].id===activeId){files[k].content=val;break;}
@@ -653,9 +560,8 @@ redoBtn.addEventListener('click',doRedo);
 selAllBtn.addEventListener('click',function(){codeArea.focus();codeArea.select();copyTip.classList.add('show');});
 copyBtn.addEventListener('click',function(){
   var txt=codeArea.value;
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(txt).catch(function(){fbCopy(txt);});
-  }else fbCopy(txt);
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).catch(function(){fbCopy(txt);}); }
+  else fbCopy(txt);
   copyTip.classList.remove('show');
   showToast('Copied!');
 });
@@ -769,13 +675,7 @@ deleteBtn.addEventListener('click',function(){
   closeDropdown();
   showToast('Code cleared');
 });
-
-renameBtn.addEventListener('click',function(e){
-  e.stopPropagation();
-  startEditTabName(activeId);
-  closeDropdown();
-});
-
+renameBtn.addEventListener('click',function(e){ e.stopPropagation(); startEditTabName(activeId); closeDropdown(); });
 addFileBtn.addEventListener('click',function(){
   var id = nextId++;
   var name = 'file'+id+'.js';
@@ -788,310 +688,45 @@ addFileBtn.addEventListener('click',function(){
   codeArea.focus();
 });
 
+function closePreviewFn() { previewOverlay.classList.remove('show'); previewFrame.srcdoc = ''; }
+closePreviewBtn.addEventListener('click', function(e) { e.stopPropagation(); closePreviewFn(); });
+closePreviewBtn.addEventListener('touchend', function(e) { e.preventDefault(); e.stopPropagation(); closePreviewFn(); });
+previewOverlay.addEventListener('click', function(e) { if (e.target === previewOverlay) closePreviewFn(); });
+
 function buildMultiFilePreview(){
   var activeFile = getFile();
   var baseFile = null;
   if (/\.html$/i.test(activeFile.name)) { baseFile = activeFile; }
-  else {
-    for (var i = 0; i < files.length; i++) {
-      if (/\.html$/i.test(files[i].name)) { baseFile = files[i]; break; }
-    }
-  }
+  else { for (var i = 0; i < files.length; i++) { if (/\.html$/i.test(files[i].name)) { baseFile = files[i]; break; } } }
   if (!baseFile) return activeFile.content;
-
-  var htmlContent = baseFile.content;
+  
+  var baseContent = baseFile.content;
   var cssTags = '', jsTags = '';
   for (var i = 0; i < files.length; i++) {
-    var file = files[i];
-    if (file.id === baseFile.id) continue;
-    var nameLower = file.name.toLowerCase();
-    if (nameLower.endsWith('.css')) { cssTags += '\n<style>\n' + file.content + '\n</style>\n'; }
-    else if (nameLower.endsWith('.js')) { jsTags += '\n<script>\n' + file.content + '\n<\/script>\n'; }
+    var f = files[i];
+    if (f.id === baseFile.id) continue;
+    var nameLower = f.name.toLowerCase();
+    if (nameLower.endsWith('.css')) { cssTags += '\n<style>\n' + f.content + '\n</style>\n'; }
+    else if (nameLower.endsWith('.js')) { jsTags += '\n<script>\n' + f.content + '\n<\/script>\n'; }
   }
-
-  if (!/<head/i.test(htmlContent) && !/<body/i.test(htmlContent)) {
-    htmlContent = '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"></head><body>\n' + htmlContent + '\n</body></html>';
-  }
-
-  var result = htmlContent;
+  
+  var result = baseContent;
   if (cssTags) result = result.replace(/<\/head>/i, cssTags + '</head>');
   if (jsTags) result = result.replace(/<\/body>/i, jsTags + '</body>');
   return result;
 }
 
-// ═══════════ PROFESSIONAL LINTER SYSTEM ═══════════
-var detectedIssues = [];
-var previewContentCache = '';
-
-function detectIssues(html) {
-  var issues = [];
-  if (!html || !html.trim()) return issues;
-
-  // 1. JavaScript Syntax Check (REAL PARSER)
-  var jsMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
-  var jsCode = '';
-  if (jsMatches) {
-    jsMatches.forEach(function(match) {
-      var content = match.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '');
-      jsCode += content + '\n';
-    });
-  } else if (!/<[a-zA-Z]/.test(html) && /\b(function|const|let|var|=>|console)\b/.test(html)) {
-    jsCode = html;
-  }
-
-  if (jsCode.trim()) {
-    try {
-      new Function(jsCode);
-    } catch(e) {
-      var lineMatch = e.message.match(/line (\d+)/i) || e.stack.match(/:(\d+):\d+/);
-      var line = lineMatch ? parseInt(lineMatch[1]) : 1;
-      issues.push({
-        type: 'error',
-        title: 'خطأ في JavaScript',
-        desc: e.message + ' (سطر ' + line + ')',
-        fix: null
-      });
-    }
-  }
-
-  // 2. CSS Syntax Check (REAL PARSER)
-  var cssMatches = html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
-  var cssCode = '';
-  if (cssMatches) {
-    cssMatches.forEach(function(match) {
-      var content = match.replace(/<style[^>]*>/i, '').replace(/<\/style>/i, '');
-      cssCode += content + '\n';
-    });
-  } else if (!/<[a-zA-Z]/.test(html) && /[:{};]/.test(html)) {
-    cssCode = html;
-  }
-
-  if (cssCode.trim() && 'CSSStyleSheet' in window && 'replaceSync' in CSSStyleSheet.prototype) {
-    try {
-      var sheet = new CSSStyleSheet();
-      sheet.replaceSync(cssCode);
-    } catch(e) {
-      issues.push({
-        type: 'error',
-        title: 'خطأ في CSS',
-        desc: e.message,
-        fix: null
-      });
-    }
-  }
-
-  // 3. HTML Structure Check (REAL PARSER)
-  if (/<[a-zA-Z]/.test(html)) {
-    var parser = new DOMParser();
-    var doc = parser.parseFromString(html, 'text/html');
-    
-    if (!/<!DOCTYPE/i.test(html)) {
-      issues.push({
-        type: 'warning',
-        title: 'DOCTYPE مفقود',
-        desc: 'أضف <!DOCTYPE html> في البداية',
-        fix: function(h) { return '<!DOCTYPE html>\n' + h; }
-      });
-    }
-
-    if (!doc.querySelector('html')) {
-      issues.push({
-        type: 'warning',
-        title: 'وسم <html> مفقود',
-        desc: 'أضف وسم <html>',
-        fix: function(h) { return '<!DOCTYPE html>\n<html>\n' + h + '\n</html>'; }
-      });
-    }
-
-    if (doc.querySelector('html') && !doc.querySelector('head') && !doc.querySelector('body')) {
-      issues.push({
-        type: 'warning',
-        title: '<head> و <body> مفقودان',
-        desc: 'أضف <head> و <body>',
-        fix: function(h) {
-          return h.replace(/(<html[^>]*>)/i, '$1\n<head><meta charset="UTF-8"></head>\n<body>')
-                  .replace(/<\/html>/i, '</body>\n</html>');
-        }
-      });
-    }
-
-    // Check for unclosed tags
-    var tagStack = [];
-    var tagRegex = /<\/?([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g;
-    var match;
-    while ((match = tagRegex.exec(html)) !== null) {
-      var tagName = match[1].toLowerCase();
-      var isClosing = match[0].startsWith('</');
-      var isSelfClosing = match[0].endsWith('/>') || ['br','hr','img','input','meta','link'].indexOf(tagName) !== -1;
-      
-      if (!isClosing && !isSelfClosing) {
-        tagStack.push({name: tagName, pos: match.index});
-      } else if (isClosing) {
-        if (tagStack.length > 0 && tagStack[tagStack.length-1].name === tagName) {
-          tagStack.pop();
-        } else {
-          issues.push({
-            type: 'error',
-            title: 'وسم غير مغلق: <' + tagName + '>',
-            desc: 'لا يوجد وسم فتح لـ </' + tagName + '>',
-            fix: null
-          });
-        }
-      }
-    }
-
-    tagStack.forEach(function(tag) {
-      issues.push({
-        type: 'error',
-        title: 'وسم غير مغلق: <' + tag.name + '>',
-        desc: 'الوسم <' + tag.name + '> لم يتم إغلاقه',
-        fix: null
-      });
-    });
-  }
-
-  // 4. Markdown fences
-  if (/```/.test(html)) {
-    issues.push({
-      type: 'warning',
-      title: 'علامات Markdown',
-      desc: 'أزل علامات ``` من الكود',
-      fix: function(h) { return h.replace(/```[\w-]*\s*\n?/g, '').replace(/```/g, ''); }
-    });
-  }
-
-  return issues;
-}
-
-function renderIssueModal(issues, previewContent) {
-  if (!issues.length) {
-    issueBody.innerHTML = '<div class="issue-empty">✅ لا توجد مشاكل، الكود جاهز للمعاينة.</div>';
-    issueFixAll.style.display = 'none';
-    issuePreviewRaw.style.display = 'none';
-    setTimeout(function() {
-      issueOverlay.classList.remove('show');
-      openPreviewWithContent(previewContent);
-    }, 500);
-  } else {
-    var html = '';
-    for (var i = 0; i < issues.length; i++) {
-      var iss = issues[i];
-      var icon = iss.type === 'error' ? '❌' : (iss.type === 'warning' ? '⚠️' : 'ℹ️');
-      html += '<div class="issue-item">';
-      html += '<span class="issue-icon ' + iss.type + '">' + icon + '</span>';
-      html += '<div class="issue-text">';
-      html += '<div class="issue-title">' + iss.title + '</div>';
-      html += '<div class="issue-desc">' + iss.desc + '</div>';
-      html += '</div>';
-      if (iss.fix) {
-        html += '<button class="issue-fix-btn" data-issue-idx="' + i + '">إصلاح</button>';
-      }
-      html += '</div>';
-    }
-    issueBody.innerHTML = html;
-    issueFixAll.style.display = 'inline-block';
-    issuePreviewRaw.style.display = 'inline-block';
-
-    var fixBtns = issueBody.querySelectorAll('.issue-fix-btn');
-    for (var b = 0; b < fixBtns.length; b++) {
-      fixBtns[b].addEventListener('click', function(e) {
-        var idx = parseInt(this.getAttribute('data-issue-idx'));
-        var issue = detectedIssues[idx];
-        if (issue && issue.fix) {
-          previewContentCache = issue.fix(previewContentCache);
-          detectedIssues = detectIssues(previewContentCache);
-          renderIssueModal(detectedIssues, previewContentCache);
-        }
-      });
-    }
-  }
-}
-
-function openPreviewWithContent(content) {
-  previewFrame.srcdoc = content;
-  previewOverlay.classList.add('show');
-}
-
-function closePreviewFn() {
-  previewOverlay.classList.remove('show');
-  previewFrame.srcdoc = '';
-}
-
-closePreviewBtn.addEventListener('click', function(e) {
-  e.stopPropagation();
-  closePreviewFn();
-});
-closePreviewBtn.addEventListener('touchend', function(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  closePreviewFn();
-});
-
-previewOverlay.addEventListener('click', function(e) {
-  if (e.target === previewOverlay) {
-    closePreviewFn();
-  }
-});
-
-function handlePlayClick() {
+playBtn.addEventListener('click', function() {
   var combined = buildMultiFilePreview();
-  previewContentCache = combined;
-  detectedIssues = detectIssues(combined);
-
-  if (detectedIssues.length === 0) {
-    openPreviewWithContent(combined);
-  } else {
-    renderIssueModal(detectedIssues, combined);
-    issueOverlay.classList.add('show');
-  }
-}
-playBtn.addEventListener('click', handlePlayClick);
-
-issueCloseBtn.addEventListener('click', function() {
-  issueOverlay.classList.remove('show');
-});
-issuePreviewRaw.addEventListener('click', function() {
-  issueOverlay.classList.remove('show');
-  openPreviewWithContent(previewContentCache);
-});
-issueFixAll.addEventListener('click', function() {
-  for (var i = 0; i < detectedIssues.length; i++) {
-    if (detectedIssues[i].fix) {
-      previewContentCache = detectedIssues[i].fix(previewContentCache);
-    }
-  }
-  detectedIssues = detectIssues(previewContentCache);
-  if (detectedIssues.length === 0) {
-    issueOverlay.classList.remove('show');
-    openPreviewWithContent(previewContentCache);
-  } else {
-    renderIssueModal(detectedIssues, previewContentCache);
-  }
-});
-issueOverlay.addEventListener('click', function(e) {
-  if (e.target === issueOverlay) {
-    issueOverlay.classList.remove('show');
-  }
+  previewFrame.srcdoc = combined;
+  previewOverlay.classList.add('show');
 });
 
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
-    if(issueOverlay.classList.contains('show')){
-      issueOverlay.classList.remove('show');
-      return;
-    }
-    if(savesPanel.classList.contains('show')){
-      savesPanel.classList.remove('show');
-      return;
-    }
-    if(previewOverlay.classList.contains('show')){
-      closePreviewFn();
-      return;
-    }
-    if(editingTabId !== null){
-      cancelRename();
-      return;
-    }
+    if(savesPanel.classList.contains('show')){ savesPanel.classList.remove('show'); return; }
+    if(previewOverlay.classList.contains('show')){ closePreviewFn(); return; }
+    if(editingTabId !== null){ cancelRename(); return; }
     closeDropdown();
   }
 });
